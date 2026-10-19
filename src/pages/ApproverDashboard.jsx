@@ -119,20 +119,26 @@ ErrorState.propTypes = { message: PropTypes.string.isRequired };
  * @param {Function} props.onViewAllActivity  - Called when the "View all activity" button is clicked.
  */
 const ApproverDashboard = ({
-  approver         = SAMPLE_APPROVER_USER,
-  stats            = SAMPLE_STATS,
+  approver: approverProp = SAMPLE_APPROVER_USER,
+  stats: statsProp = SAMPLE_STATS,
   statsLoading     = false,
   statsError       = null,
-  schedule         = SAMPLE_SCHEDULE,
+  schedule: scheduleProp = SAMPLE_SCHEDULE,
   scheduleLoading  = false,
   scheduleError    = null,
-  activity         = SAMPLE_ACTIVITY,
+  activity: activityProp = SAMPLE_ACTIVITY,
   activityLoading  = false,
   activityError    = null,
   onReviewRequests  = () => { /* TODO: navigate('/approver/approvals') */ },
   onViewCalendar    = () => { /* TODO: navigate('/approver/schedule')  */ },
   onViewAllActivity = () => { /* TODO: navigate('/approver/approvals') */ },
 }) => {
+  const approver = approverProp && typeof approverProp === 'object' && typeof approverProp.name === 'string'
+    ? approverProp
+    : SAMPLE_APPROVER_USER;
+  const stats = Array.isArray(statsProp) ? statsProp.filter((item) => item && typeof item === 'object') : [];
+  const schedule = Array.isArray(scheduleProp) ? scheduleProp.filter((item) => item && typeof item === 'object') : [];
+  const activity = Array.isArray(activityProp) ? activityProp.filter((item) => item && typeof item === 'object') : [];
   const greeting = `${getTimeGreeting()}, ${approver.name}`;
 
   return (
@@ -171,6 +177,12 @@ const ApproverDashboard = ({
           <div className={styles.statsErrorBanner}>
             <AlertCircle size={16} aria-hidden="true" />
             {statsError}
+          </div>
+        )}
+
+        {!statsLoading && !statsError && stats.length === 0 && (
+          <div className={styles.statsEmptyState}>
+            <EmptyState message="No summary statistics available." />
           </div>
         )}
 
@@ -294,7 +306,7 @@ ApproverDashboard.propTypes = {
     name:       PropTypes.string.isRequired,
     role:       PropTypes.string.isRequired,
     department: PropTypes.string,
-  }).isRequired,
+  }),
 
   stats: PropTypes.arrayOf(
     PropTypes.shape({
