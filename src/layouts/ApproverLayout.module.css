@@ -1,0 +1,151 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   ApproverLayout.module.css
+   Layout-specific styles for the Approver shell.
+   All colour and typography values reference tokens defined in src/index.css.
+   ───────────────────────────────────────────────────────────────────────── */
+
+/* ── Root shell: sidebar + main side-by-side ──────────────────────────── */
+.appShell {
+  display: flex;
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--color-bg-app);
+  font-family: var(--font-family);
+}
+
+/* ── Right-hand column that holds the banner + scrollable content ──────── */
+.mainWrapper {
+  flex: 1;
+  min-width: 0; /* prevent overflow past flex container */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ── Portal identity banner ────────────────────────────────────────────── */
+.portalBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 32px;
+  background-color: var(--color-accent-purple-light);
+  border-bottom: 1px solid var(--color-border-subtle);
+  flex-shrink: 0;
+}
+
+.portalBannerDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent-purple);
+  flex-shrink: 0;
+  /* Subtle pulse to indicate an "active" session indicator */
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.45; }
+}
+
+.portalBannerText {
+  font-size: 12.5px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent-purple);
+  letter-spacing: 0.2px;
+}
+
+/* ── Scrollable main content ────────────────────────────────────────────── */
+.mainContent {
+  flex: 1;
+  padding: 28px 36px 40px;
+  overflow-y: auto;
+  /* Smooth scrolling for anchored sections */
+  scroll-behavior: smooth;
+  /* Establish stacking context so page cards layer correctly */
+  position: relative;
+  outline: none; /* skip-link target — focus ring handled by browser defaults */
+}
+
+/* ── Sidebar footer navigation ─────────────────────────────────────────── */
+.footerNav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.footerBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 16px;
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  background-color: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  box-sizing: border-box;
+  transition: background-color 0.18s ease, color 0.18s ease;
+  font-family: var(--font-family);
+}
+
+.footerBtn:hover {
+  background-color: rgba(112, 71, 235, 0.08);
+  color: var(--color-text-primary);
+}
+
+.footerBtnActive {
+  background-color: var(--color-accent-purple-light);
+  color: var(--color-accent-purple);
+  font-weight: var(--font-weight-semibold);
+}
+
+.footerBtnLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Responsive: tablet (≤ 900px) ──────────────────────────────────────── */
+/*
+  At ≤ 900px the Sidebar collapses to 74px (icon-only) via its own CSS.
+  We only need to adjust the main content padding here.
+*/
+@media (max-width: 900px) {
+  .mainContent {
+    padding: 22px 24px 32px;
+  }
+
+  .portalBanner {
+    padding: 10px 20px;
+  }
+
+  /* Hide the footer button text labels when sidebar is in icon-only mode */
+  .footerBtnLabel {
+    display: none;
+  }
+
+  .footerBtn {
+    justify-content: center;
+    padding: 12px;
+  }
+}
+
+/* ── Responsive: mobile (≤ 600px) ──────────────────────────────────────── */
+@media (max-width: 600px) {
+  .mainContent {
+    padding: 16px 16px 28px;
+  }
+
+  .portalBanner {
+    padding: 8px 16px;
+  }
+
+  .portalBannerText {
+    font-size: 11.5px;
+  }
+}
