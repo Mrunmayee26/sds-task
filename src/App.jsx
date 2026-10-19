@@ -1,3 +1,4 @@
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import {
   Sidebar,
@@ -16,8 +17,11 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import './App.css';
+import ApproverDashboard from './pages/ApproverDashboard.jsx';
+import ApproverApprovals from './pages/ApproverApprovals.jsx';
+import ApproverSchedule from './pages/ApproverSchedule.jsx';
 
-export default function App() {
+function ApplicantApp() {
   const [activeNav, setActiveNav] = useState('book-venue');
   const [eventName, setEventName] = useState('');
   const [clubDept, setClubDept] = useState('');
@@ -309,3 +313,68 @@ export default function App() {
     </div>
   );
 }
+
+const ApproverDashboardRoute = () => {
+  const navigate = useNavigate();
+
+  return (
+    <ApproverDashboard
+      onReviewRequests={() => navigate('/approver/approvals')}
+      onViewCalendar={() => navigate('/approver/schedule')}
+      onViewAllActivity={() => navigate('/approver/approvals')}
+    />
+  );
+};
+
+const ApproverScheduleRoute = () => {
+  const navigate = useNavigate();
+
+  return (
+    <ApproverSchedule
+      onReviewRequests={() => navigate('/approver/approvals')}
+    />
+  );
+};
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<ApplicantApp />} />
+
+        <Route
+          path="/approver/dashboard"
+          element={<ApproverDashboardRoute />}
+        />
+
+        <Route
+          path="/approver/approvals"
+          element={<ApproverApprovals />}
+        />
+
+        <Route
+          path="/approver/schedule"
+          element={<ApproverScheduleRoute />}
+        />
+
+        {/* Redirect unfinished pages to the dashboard for now */}
+        <Route
+          path="/approver/venues"
+          element={<Navigate to="/approver/dashboard" replace />}
+        />
+
+        <Route
+          path="/approver/settings"
+          element={<Navigate to="/approver/dashboard" replace />}
+        />
+
+        {/* Redirect unknown URLs */}
+        <Route
+          path="*"
+          element={<Navigate to="/" replace />}
+        />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+

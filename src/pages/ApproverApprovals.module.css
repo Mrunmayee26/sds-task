@@ -73,6 +73,7 @@
 .availability strong { display: block; font-size: 11px; }
 .availability p { margin-top: 4px; color: var(--color-text-secondary); font-size: 10px; line-height: 1.5; }
 .hasConflict { color: #B35A24; background: #FFF6EC; border-color: #F8E4CC; }
+.availabilityNotChecked { color: var(--color-text-secondary); background: var(--color-bg-app); border-color: var(--color-border-subtle); }
 .noteLabel { display: block; margin-bottom: 8px; color: var(--color-text-primary); font-size: 11px; font-weight: var(--font-weight-semibold); }
 .noteInput { display: block; width: 100%; resize: vertical; min-height: 92px; padding: 11px 12px; color: var(--color-text-primary); background: var(--color-card-bg); border: 1px solid var(--color-border-input); border-radius: var(--radius-md); outline: none; font-size: 11px; line-height: 1.5; }
 .noteInput:focus { border-color: var(--color-accent-purple); box-shadow: 0 0 0 3px rgba(112,71,235,.12); }

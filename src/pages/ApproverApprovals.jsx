@@ -85,6 +85,16 @@ const ApproverApprovals = ({
 
   const selectedRequest = localRequests.find((request) => request.id === selectedId);
   const hasSelectedRequest = selectedRequest !== undefined;
+  const availability = selectedRequest?.availability;
+  const availabilityChecked = availability?.checked === false
+    ? false
+    : availability?.checked === true || typeof availability?.conflict === 'boolean';
+  const availabilityConflict = availabilityChecked && availability?.conflict === true;
+  const availabilityMessage = !availabilityChecked
+    ? 'Availability not checked'
+    : availabilityConflict
+      ? 'Availability conflict found'
+      : 'Availability check passed';
 
   useEffect(() => {
     if (!selectedId || !hasSelectedRequest) return undefined;
@@ -299,9 +309,9 @@ const ApproverApprovals = ({
                 </dl>
               </section>
               <section className={styles.detailSection}><h3>Purpose of booking</h3><p className={styles.purpose}>{selectedRequest.purpose || 'No purpose provided.'}</p></section>
-              <section className={`${styles.availability} ${selectedRequest.availability?.conflict ? styles.hasConflict : ''}`}>
-                {selectedRequest.availability?.conflict ? <XCircle size={18} /> : <CheckCircle2 size={18} />}
-                <div><strong>{selectedRequest.availability?.conflict ? 'Availability conflict found' : 'Availability check passed'}</strong><p>{selectedRequest.availability?.note || 'Availability has not been checked.'}</p></div>
+              <section className={`${styles.availability} ${availabilityConflict ? styles.hasConflict : ''} ${!availabilityChecked ? styles.availabilityNotChecked : ''}`}>
+                {availabilityConflict ? <XCircle size={18} /> : availabilityChecked ? <CheckCircle2 size={18} /> : <Clock3 size={18} />}
+                <div><strong>{availabilityMessage}</strong><p>{availability?.note || (availabilityChecked ? 'No availability issues were reported.' : 'Availability has not been checked yet.')}</p></div>
               </section>
               <label className={styles.noteLabel} htmlFor="review-note">Internal review note</label>
               <textarea id="review-note" className={styles.noteInput} rows="4" value={notes[selectedRequest.id] || ''} onChange={(event) => setNotes((current) => ({ ...current, [selectedRequest.id]: event.target.value }))} placeholder="Add a note for the review record…" />
