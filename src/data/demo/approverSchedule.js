@@ -5,7 +5,7 @@ const addDays = (date, days) => {
 
 const today = new Date();
 
-// Official 56 venues (Main Auditorium, Mini Auditorium, NC01-NC32, SC01-SC20)
+// Illustrative schedule records only. These are not live bookings.
 export const SAMPLE_SCHEDULE_BOOKINGS = [
   {
     id: 'SCH-101', eventName: 'Campus Innovation Forum', venue: 'Main Auditorium',

@@ -1,18 +1,65 @@
 /**
  * @file bookingService.js
- * Centralized data service managing venue bookings, availability checking,
- * conflict prevention, and cross-portal synchronization for COEP Venue Booking System.
+ * Centralized browser-local demo service for bookings, overlap checks, and same-tab synchronization.
  * Strictly uses the official 56 COEP venues (Main Auditorium, Mini Auditorium, NC01-NC32, SC01-SC20).
  *
- * NOTE FOR BACKEND INTEGRATION:
- * When FastAPI endpoints are wired in, replace localStorage read/writes
- * with async fetch calls to /api/v1/bookings, /api/v1/venues, etc.
+ * This local overlap check is a convenience for the demo only. It is not an
+ * authoritative availability decision or a concurrency guarantee.
  */
 
-import { COEP_VENUES } from '../pages/sampleData/venuesData';
+import { COEP_VENUES } from '../data/venues.js';
+import { INITIAL_BOOKINGS } from '../data/demo/bookings.js';
+import { INITIAL_NOTIFICATIONS } from '../data/demo/notifications.js';
 
 const BOOKINGS_STORAGE_KEY = 'coep_venue_bookings_v2';
 const NOTIFICATIONS_STORAGE_KEY = 'coep_venue_notifications_v2';
+
+const replaceInvalidStoredValue = (storage, key, rawValue, fallback) => {
+  try {
+    const recoveryKey = `${key}_recovery`;
+    if (!storage.getItem(recoveryKey)) storage.setItem(recoveryKey, rawValue);
+    storage.setItem(key, JSON.stringify(fallback));
+  } catch {
+    // Keep the in-memory fallback available if recovery storage is also unavailable.
+  }
+};
+
+const getStorage = () => (typeof window !== 'undefined' ? window.localStorage : null);
+const localDateKey = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const isValidDateKey = (value) => {
+  const dateKey = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return false;
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const parsed = new Date(year, month - 1, day);
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day;
+};
+const timeToMinutes = (time) => {
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || ''))) return null;
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+const createUniqueId = (prefix, existingIds) => {
+  const timestamp = Date.now().toString(36);
+  let suffix = Math.random().toString(36).slice(2, 10);
+  let id = `${prefix}-${timestamp}-${suffix}`;
+  while (existingIds.has(id)) {
+    suffix = Math.random().toString(36).slice(2, 10);
+    id = `${prefix}-${Date.now().toString(36)}-${suffix}`;
+  }
+  return id;
+};
+
+const isBookingRecord = (booking) => booking && typeof booking === 'object'
+  && typeof booking.id === 'string' && typeof booking.eventName === 'string'
+  && typeof booking.venue === 'string' && typeof booking.date === 'string'
+  && typeof booking.status === 'string';
+const isNotificationRecord = (notification) => notification && typeof notification === 'object'
+  && typeof notification.id === 'string' && typeof notification.title === 'string'
+  && typeof notification.message === 'string' && typeof notification.date === 'string';
+const normalizeBookings = (bookings) => bookings.map((booking) => {
+  const venue = getVenueById(booking.venueId) || getVenueById(booking.venue);
+  return venue && booking.venueId !== venue.id ? { ...booking, venueId: venue.id } : booking;
+});
 
 export const CURRENT_APPLICANT = {
   id: 'applicant-001',
@@ -26,231 +73,30 @@ export const CURRENT_APPLICANT = {
   avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=120&auto=format&fit=crop&q=80',
 };
 
-// Seed initial bookings using ONLY the 56 official COEP venues
-const INITIAL_BOOKINGS = [
-  {
-    id: 'REQ-2026-041',
-    eventName: 'Annual Robotics Showcase',
-    eventType: 'Exhibition',
-    applicant: {
-      id: 'applicant-001',
-      name: 'Maya Kulkarni',
-      department: 'Robotics & AI Club',
-      email: 'kulkarnim21.comp@coep.ac.in',
-      phone: '+91 98234 56789',
-      verified: true,
-    },
-    venue: 'Main Auditorium',
-    date: '2026-11-04',
-    startTime: '10:00',
-    endTime: '16:00',
-    attendance: 280,
-    purpose: 'Showcase student-built robotics projects and host demonstrations for the campus community.',
-    equipment: [],
-    specialInstructions: 'Need power extensions for live robot demonstration stations.',
-    status: 'Pending',
-    submittedAt: '2026-10-18T14:30:00Z',
-    availability: { conflict: false, note: 'No booking conflicts were found for this venue and time.' },
-  },
-  {
-    id: 'REQ-2026-040',
-    eventName: 'Design Thinking Workshop',
-    eventType: 'Workshop',
-    applicant: {
-      id: 'applicant-002',
-      name: 'Rohan Deshpande',
-      department: 'Innovation Cell',
-      email: 'deshpander20.mech@coep.ac.in',
-      phone: '+91 98765 43210',
-      verified: true,
-    },
-    venue: 'Mini Auditorium',
-    date: '2026-11-06',
-    startTime: '13:30',
-    endTime: '17:00',
-    attendance: 72,
-    purpose: 'A hands-on workshop introducing human-centered design methods to student teams.',
-    equipment: [],
-    status: 'Pending',
-    submittedAt: '2026-10-19T09:15:00Z',
-    availability: { conflict: true, note: 'A tentative reservation overlaps from 15:00 to 16:00.' },
-  },
-  {
-    id: 'REQ-2026-039',
-    eventName: 'Literary Society Open Mic',
-    eventType: 'Student event',
-    applicant: {
-      id: 'applicant-003',
-      name: 'Ananya Joshi',
-      department: 'Literary & Debate Society',
-      email: 'joshia22.entc@coep.ac.in',
-      phone: '+91 91234 56780',
-      verified: true,
-    },
-    venue: 'NC01',
-    date: '2026-11-08',
-    startTime: '17:00',
-    endTime: '20:00',
-    attendance: 60,
-    purpose: 'An evening of poetry, short readings, and student performances.',
-    equipment: [],
-    status: 'Approved',
-    submittedAt: '2026-10-17T11:00:00Z',
-    decisionDate: '2026-10-19',
-    decisionBy: 'Dr. Sharma (Academic Affairs)',
-    availability: { conflict: false, note: 'No booking conflicts were found for this venue and time.' },
-  },
-  {
-    id: 'REQ-2026-038',
-    eventName: 'Department Research Colloquium',
-    eventType: 'Academic event',
-    applicant: {
-      id: 'applicant-004',
-      name: 'Kabir Patil',
-      department: 'Mechanical Engineering',
-      email: 'patilk.faculty@coep.ac.in',
-      phone: '+91 94567 12345',
-      verified: false,
-    },
-    venue: 'SC01',
-    date: '2026-11-10',
-    startTime: '09:30',
-    endTime: '12:30',
-    attendance: 48,
-    purpose: 'Faculty and postgraduate researchers will present current department projects.',
-    equipment: [],
-    status: 'Rejected',
-    submittedAt: '2026-10-16T16:45:00Z',
-    decisionDate: '2026-10-19',
-    decisionBy: 'Dr. Sharma (Academic Affairs)',
-    reviewerNotes: 'SC01 is reserved for department mid-term tests on 10th Nov morning. Please select another classroom.',
-    availability: { conflict: false, note: 'No booking conflicts were found for this venue and time.' },
-  },
-  {
-    id: 'REQ-2026-035',
-    eventName: 'AI Model Deployment Bootcamp',
-    eventType: 'Workshop',
-    applicant: {
-      id: 'applicant-001',
-      name: 'Maya Kulkarni',
-      department: 'Robotics & AI Club',
-      email: 'kulkarnim21.comp@coep.ac.in',
-      phone: '+91 98234 56789',
-      verified: true,
-    },
-    venue: 'NC12',
-    date: '2026-10-28',
-    startTime: '14:00',
-    endTime: '17:00',
-    attendance: 55,
-    purpose: 'Hands-on training on deploying machine learning and robotics algorithms.',
-    equipment: [],
-    status: 'Approved',
-    submittedAt: '2026-10-15T10:00:00Z',
-    decisionDate: '2026-10-17',
-    decisionBy: 'Dr. Sharma (Academic Affairs)',
-    reviewerNotes: 'Department key assistant will open the classroom at 13:45.',
-    availability: { conflict: false, note: 'No booking conflicts.' },
-  },
-  {
-    id: 'REQ-2026-031',
-    eventName: 'Drone Navigation Flight Test Briefing',
-    eventType: 'Competition / Practice',
-    applicant: {
-      id: 'applicant-001',
-      name: 'Maya Kulkarni',
-      department: 'Robotics & AI Club',
-      email: 'kulkarnim21.comp@coep.ac.in',
-      phone: '+91 98234 56789',
-      verified: true,
-    },
-    venue: 'SC05',
-    date: '2026-10-24',
-    startTime: '16:00',
-    endTime: '18:30',
-    attendance: 40,
-    purpose: 'Autonomous drone flight path theory and pre-flight parameter reviews.',
-    equipment: [],
-    status: 'Approved',
-    submittedAt: '2026-10-12T13:20:00Z',
-    decisionDate: '2026-10-14',
-    decisionBy: 'Dr. Sharma (Academic Affairs)',
-    availability: { conflict: false, note: 'No booking conflicts.' },
-  },
-  {
-    id: 'REQ-2026-028',
-    eventName: 'Autonomous Rover Sensor Calibration',
-    eventType: 'Lab / Testing',
-    applicant: {
-      id: 'applicant-001',
-      name: 'Maya Kulkarni',
-      department: 'Robotics & AI Club',
-      email: 'kulkarnim21.comp@coep.ac.in',
-      phone: '+91 98234 56789',
-      verified: true,
-    },
-    venue: 'NC04',
-    date: '2026-10-14',
-    startTime: '09:00',
-    endTime: '12:00',
-    attendance: 35,
-    purpose: 'Indoor mapping and lidar sensor calibration across level classroom floor.',
-    equipment: [],
-    status: 'Rejected',
-    submittedAt: '2026-10-10T08:00:00Z',
-    decisionDate: '2026-10-11',
-    decisionBy: 'Dr. Sharma (Academic Affairs)',
-    reviewerNotes: 'NC04 was reserved for regular second-year evaluation. Please select another slot.',
-    availability: { conflict: false, note: 'No booking conflicts.' },
-  },
-];
-
-const INITIAL_NOTIFICATIONS = [
-  {
-    id: 'notif-1',
-    title: 'Booking Approved',
-    message: 'Your request for "AI Model Deployment Bootcamp" at NC12 has been approved.',
-    date: '2026-10-17T15:00:00Z',
-    read: false,
-    type: 'success',
-    link: '/applicant/applications',
-  },
-  {
-    id: 'notif-2',
-    title: 'Reviewer Feedback Received',
-    message: 'Your request for "Autonomous Rover Sensor Calibration" was rejected with reviewer remarks.',
-    date: '2026-10-11T12:00:00Z',
-    read: false,
-    type: 'warning',
-    link: '/applicant/applications',
-  },
-  {
-    id: 'notif-3',
-    title: 'Upcoming Booking Reminder',
-    message: 'Drone Navigation Flight Test Briefing is scheduled at SC05 on 24th Oct.',
-    date: '2026-10-19T08:30:00Z',
-    read: true,
-    type: 'info',
-    link: '/applicant/schedule',
-  },
-];
-
 /**
  * Loads bookings from localStorage or seeds with INITIAL_BOOKINGS
  */
 export function getAllBookings() {
+  let storage;
+  let raw;
   try {
-    const raw = localStorage.getItem(BOOKINGS_STORAGE_KEY);
+    storage = getStorage();
+    if (!storage) return normalizeBookings(INITIAL_BOOKINGS);
+    raw = storage.getItem(BOOKINGS_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(INITIAL_BOOKINGS));
-      return INITIAL_BOOKINGS;
+      storage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(INITIAL_BOOKINGS));
+      return normalizeBookings(INITIAL_BOOKINGS);
     }
     const parsed = JSON.parse(raw);
-    // Sanity check: Ensure only valid bookings exist
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : INITIAL_BOOKINGS;
+    if (!Array.isArray(parsed) || !parsed.every(isBookingRecord)) {
+      replaceInvalidStoredValue(storage, BOOKINGS_STORAGE_KEY, raw, INITIAL_BOOKINGS);
+      return normalizeBookings(INITIAL_BOOKINGS);
+    }
+    return normalizeBookings(parsed);
   } catch (err) {
     console.error('Failed to load bookings from storage', err);
-    return INITIAL_BOOKINGS;
+    if (storage && raw) replaceInvalidStoredValue(storage, BOOKINGS_STORAGE_KEY, raw, INITIAL_BOOKINGS);
+    return normalizeBookings(INITIAL_BOOKINGS);
   }
 }
 
@@ -258,12 +104,19 @@ export function getAllBookings() {
  * Saves bookings to localStorage and notifies listeners
  */
 export function saveBookings(bookings) {
+  let storage;
   try {
-    localStorage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings));
-    window.dispatchEvent(new CustomEvent('coep_bookings_changed', { detail: bookings }));
-  } catch (err) {
-    console.error('Failed to save bookings', err);
+    storage = getStorage();
+  } catch (error) {
+    throw new Error(`Browser storage is unavailable: ${error.message}`, { cause: error });
   }
+  if (!storage) throw new Error('Booking storage is unavailable in this environment.');
+  try {
+    storage.setItem(BOOKINGS_STORAGE_KEY, JSON.stringify(bookings));
+  } catch (error) {
+    throw new Error(`Could not save the booking update in this browser: ${error.message}`, { cause: error });
+  }
+  window.dispatchEvent(new CustomEvent('coep_bookings_changed', { detail: bookings }));
 }
 
 /**
@@ -278,21 +131,12 @@ export function getAllVenues() {
  */
 export function getVenueById(idOrName) {
   if (!idOrName) return null;
-  const normalized = idOrName.toLowerCase().trim();
+  const normalized = String(idOrName).toLowerCase().trim();
   return (
     COEP_VENUES.find(
       (v) => v.id.toLowerCase() === normalized || v.name.toLowerCase() === normalized
     ) || null
   );
-}
-
-/**
- * Convert time string "HH:MM" to minutes from midnight
- */
-function timeToMinutes(timeStr) {
-  if (!timeStr) return 0;
-  const [h, m] = timeStr.split(':').map(Number);
-  return (h || 0) * 60 + (m || 0);
 }
 
 /**
@@ -302,19 +146,23 @@ export function checkTimeslotConflict(venueName, date, startTime, endTime, exclu
   const all = getAllBookings();
   const startMin = timeToMinutes(startTime);
   const endMin = timeToMinutes(endTime);
-
-  const normalizedVenue = String(venueName || '').trim().toLowerCase();
+  const venue = getVenueById(venueName);
+  const normalizedVenue = venue?.id || String(venueName || '').trim().toLowerCase();
+  if (!isValidDateKey(date) || startMin === null || endMin === null || endMin <= startMin || !normalizedVenue) {
+    return { hasConflict: false, conflictingBooking: null, message: 'Choose a valid date and time range to check availability.' };
+  }
 
   const conflicting = all.find((b) => {
     if (excludeBookingId && b.id === excludeBookingId) return false;
-    if (b.status === 'Rejected' || b.status === 'Cancelled') return false;
+    if (!['Pending', 'Approved'].includes(b.status)) return false;
     if (b.date !== date) return false;
 
-    const bVenue = String(b.venue || '').trim().toLowerCase();
+    const bVenue = getVenueById(b.venueId || b.venue)?.id || String(b.venue || '').trim().toLowerCase();
     if (bVenue !== normalizedVenue) return false;
 
     const bStart = timeToMinutes(b.startTime);
     const bEnd = timeToMinutes(b.endTime);
+    if (bStart === null || bEnd === null || bEnd <= bStart) return false;
 
     // Overlap condition: startA < endB and endA > startB
     return startMin < bEnd && endMin > bStart;
@@ -336,14 +184,15 @@ export function checkTimeslotConflict(venueName, date, startTime, endTime, exclu
  */
 export function getApplicantBookings(applicantName = CURRENT_APPLICANT.name) {
   const all = getAllBookings();
+  const normalizedName = String(applicantName || '').trim().toLowerCase();
   return all.filter((b) => {
     if (!b.applicant) return false;
     if (typeof b.applicant === 'string') {
-      return b.applicant.toLowerCase().includes(applicantName.toLowerCase());
+      return b.applicant.toLowerCase() === normalizedName;
     }
     return (
-      b.applicant.name?.toLowerCase().includes(applicantName.toLowerCase()) ||
-      b.applicant.id === CURRENT_APPLICANT.id
+      b.applicant.id === CURRENT_APPLICANT.id && normalizedName === CURRENT_APPLICANT.name.toLowerCase()
+      || b.applicant.name?.toLowerCase() === normalizedName
     );
   });
 }
@@ -352,62 +201,43 @@ export function getApplicantBookings(applicantName = CURRENT_APPLICANT.name) {
  * Create a new booking submitted by applicant
  */
 export function createBooking(data) {
+  const input = data && typeof data === 'object' ? data : {};
   const all = getAllBookings();
-
-  // Validate times
-  const startMin = timeToMinutes(data.startTime);
-  const endMin = timeToMinutes(data.endTime);
-  if (endMin <= startMin) {
-    throw new Error('End time must be later than start time.');
-  }
-
-  // Validate venue exists in official 56 list
-  const venueObj = getVenueById(data.venue);
-  if (!venueObj) {
-    throw new Error(`"${data.venue}" is not a valid COEP venue. Please select from the official 56 facilities.`);
-  }
-
-  // Validate capacity only if officially configured
-  if (typeof venueObj.capacity === 'number' && Number(data.attendance) > venueObj.capacity) {
-    throw new Error(
-      `Expected attendance (${data.attendance}) exceeds maximum configured capacity of ${venueObj.capacity} seats for ${venueObj.name}.`
-    );
-  }
-
-  // Check conflicts
-  const conflictCheck = checkTimeslotConflict(data.venue, data.date, data.startTime, data.endTime);
+  const venueObj = getVenueById(input.venue);
+  validateBookingDetails(input, venueObj);
+  const conflictCheck = checkTimeslotConflict(venueObj.id, input.date, input.startTime, input.endTime);
   if (conflictCheck.hasConflict) {
     throw new Error(conflictCheck.message);
   }
 
-  // Generate ID
-  const nextNum = all.length + 42;
-  const newId = `REQ-2026-${String(nextNum).padStart(3, '0')}`;
+  const existingIds = new Set(all.map((booking) => booking.id));
+  const newId = createUniqueId('REQ', existingIds);
 
   const newBooking = {
     id: newId,
-    eventName: data.eventName,
-    eventType: data.eventType || 'Academic Session',
+    eventName: input.eventName.trim(),
+    eventType: input.eventType || 'Academic Session',
     applicant: {
       id: CURRENT_APPLICANT.id,
-      name: data.applicantName || CURRENT_APPLICANT.name,
-      department: data.department || CURRENT_APPLICANT.club,
-      email: data.email || CURRENT_APPLICANT.email,
-      phone: data.phone || CURRENT_APPLICANT.phone,
+      name: input.applicantName || CURRENT_APPLICANT.name,
+      department: input.department || CURRENT_APPLICANT.club,
+      email: input.email || CURRENT_APPLICANT.email,
+      phone: input.phone || CURRENT_APPLICANT.phone,
       verified: true,
     },
-    venue: venueObj.name, // Ensure exact official name stored
-    date: data.date,
-    startTime: data.startTime,
-    endTime: data.endTime,
-    attendance: Number(data.attendance) || 1,
-    purpose: data.purpose || '',
-    equipment: data.equipment || [],
-    specialInstructions: data.specialInstructions || '',
-    supportingDocument: data.supportingDocument || null,
-    status: 'Pending', // Enforced: applicants cannot self-approve
+    venueId: venueObj.id,
+    venue: venueObj.name,
+    date: input.date,
+    startTime: input.startTime,
+    endTime: input.endTime,
+    attendance: Number(input.attendance),
+    purpose: input.purpose.trim(),
+    equipment: Array.isArray(input.equipment) ? [...input.equipment] : [],
+    specialInstructions: input.specialInstructions || '',
+    supportingDocument: input.supportingDocument || null,
+    status: 'Pending',
     submittedAt: new Date().toISOString(),
-    availability: { conflict: false, note: 'Availability checked at submission time.' },
+    availability: { conflict: false, note: 'No overlapping local demo booking was found at submission time.' },
   };
 
   const updated = [newBooking, ...all];
@@ -416,7 +246,7 @@ export function createBooking(data) {
   // Add in-app notification
   addNotification({
     title: 'Booking Request Submitted',
-    message: `Your request "${data.eventName}" (${newId}) for ${venueObj.name} was submitted and is pending faculty review.`,
+    message: `Your request "${data.eventName}" (${newId}) for ${venueObj.name} was saved in local demo data with status Pending.`,
     type: 'info',
     link: '/applicant/applications',
   });
@@ -424,21 +254,42 @@ export function createBooking(data) {
   return newBooking;
 }
 
+function validateBookingDetails(data, venue) {
+  if (!venue) throw new Error(`"${data.venue || ''}" is not a valid COEP venue. Please select a venue from the catalog.`);
+  if (!String(data.eventName || '').trim()) throw new Error('Event name is required.');
+  if (!String(data.purpose || '').trim()) throw new Error('Event purpose is required.');
+  if (!isValidDateKey(data.date) || data.date <= localDateKey()) throw new Error('Choose a future booking date.');
+  const start = timeToMinutes(data.startTime);
+  const end = timeToMinutes(data.endTime);
+  if (start === null || end === null || end <= start) throw new Error('Enter a valid time range with an end time after the start time.');
+  const attendance = Number(data.attendance);
+  if (!Number.isInteger(attendance) || attendance < 1) throw new Error('Expected attendance must be a positive whole number.');
+  if (typeof venue.capacity === 'number' && attendance > venue.capacity) {
+    throw new Error(`Expected attendance exceeds the configured capacity of ${venue.capacity} for ${venue.name}.`);
+  }
+  const email = data.email || data.applicant?.email;
+  const phone = data.phone || data.applicant?.phone;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || ''))) throw new Error('Enter a valid college email address.');
+  if (!String(phone || '').trim()) throw new Error('A contact number is required.');
+}
+
 /**
  * Update a booking status (Approver action or cancellation).
- * Enforces availability recheck upon approval to prevent overlapping confirmed bookings!
+ * Re-checks local demo records before approval. This cannot prevent concurrent conflicts.
  */
 export function updateBookingStatus(id, newStatus, reviewerNotes = '', decisionBy = 'Dr. Sharma') {
+  if (!['Approved', 'Rejected'].includes(newStatus)) throw new Error('Only approve or reject decisions are supported.');
   const all = getAllBookings();
   const index = all.findIndex((b) => b.id === id);
   if (index === -1) throw new Error('Booking not found');
 
   const existing = all[index];
+  if (existing.status !== 'Pending') throw new Error(`Only pending bookings can be reviewed. This booking is ${existing.status}.`);
 
   // Re-check conflict upon approval
   if (newStatus === 'Approved') {
     const conflict = checkTimeslotConflict(
-      existing.venue,
+      existing.venueId || existing.venue,
       existing.date,
       existing.startTime,
       existing.endTime,
@@ -452,9 +303,9 @@ export function updateBookingStatus(id, newStatus, reviewerNotes = '', decisionB
   const updated = {
     ...existing,
     status: newStatus,
-    reviewerNotes: reviewerNotes || existing.reviewerNotes || '',
-    decisionDate: new Date().toISOString().slice(0, 10),
-    decisionBy: decisionBy,
+    reviewerNotes: String(reviewerNotes || '').trim(),
+    decisionDate: localDateKey(),
+    decisionBy,
   };
 
   const nextList = [...all];
@@ -468,7 +319,7 @@ export function updateBookingStatus(id, newStatus, reviewerNotes = '', decisionB
   ) {
     addNotification({
       title: `Booking ${newStatus}`,
-      message: `Your booking "${existing.eventName}" at ${existing.venue} has been marked as ${newStatus}.${
+      message: `Your local demo booking "${existing.eventName}" at ${existing.venue} was marked ${newStatus}.${
         reviewerNotes ? ` Remarks: ${reviewerNotes}` : ''
       }`,
       type: newStatus === 'Approved' ? 'success' : newStatus === 'Rejected' ? 'warning' : 'info',
@@ -488,7 +339,7 @@ export function cancelBooking(id, reason = 'Cancelled by applicant') {
   if (index === -1) throw new Error('Booking not found');
 
   const existing = all[index];
-  if (existing.status === 'Cancelled') return existing;
+  if (existing.status !== 'Pending') throw new Error(`Only pending bookings can be cancelled. This booking is ${existing.status}.`);
 
   const updated = {
     ...existing,
@@ -503,7 +354,7 @@ export function cancelBooking(id, reason = 'Cancelled by applicant') {
 
   addNotification({
     title: 'Booking Cancelled',
-    message: `You cancelled the reservation for "${existing.eventName}" (${existing.id}) at ${existing.venue}.`,
+    message: `You cancelled the local demo reservation for "${existing.eventName}" (${existing.id}) at ${existing.venue}.`,
     type: 'info',
     link: '/applicant/applications',
   });
@@ -520,26 +371,31 @@ export function resubmitBooking(id, updatedFields) {
   if (index === -1) throw new Error('Booking not found');
 
   const existing = all[index];
+  if (existing.status !== 'Rejected') throw new Error(`Only rejected bookings can be resubmitted. This booking is ${existing.status}.`);
+  const fields = updatedFields && typeof updatedFields === 'object' ? updatedFields : {};
 
   // Validate venue in official list
-  const venue = updatedFields.venue || existing.venue;
+  const venue = fields.venue || existing.venue;
   const venueObj = getVenueById(venue);
   if (!venueObj) {
     throw new Error(`"${venue}" is not a valid COEP venue.`);
   }
 
-  const date = updatedFields.date || existing.date;
-  const startTime = updatedFields.startTime || existing.startTime;
-  const endTime = updatedFields.endTime || existing.endTime;
+  const date = fields.date || existing.date;
+  const startTime = fields.startTime || existing.startTime;
+  const endTime = fields.endTime || existing.endTime;
+  const candidate = { ...existing, ...fields, venue, date, startTime, endTime };
+  validateBookingDetails(candidate, venueObj);
 
-  const conflictCheck = checkTimeslotConflict(venue, date, startTime, endTime, id);
+  const conflictCheck = checkTimeslotConflict(venueObj.id, date, startTime, endTime, id);
   if (conflictCheck.hasConflict) {
     throw new Error(conflictCheck.message);
   }
 
   const updated = {
     ...existing,
-    ...updatedFields,
+    ...fields,
+    venueId: venueObj.id,
     venue: venueObj.name,
     date,
     startTime,
@@ -558,7 +414,7 @@ export function resubmitBooking(id, updatedFields) {
 
   addNotification({
     title: 'Booking Resubmitted',
-    message: `"${updated.eventName}" (${id}) for ${venueObj.name} has been resubmitted for faculty approval.`,
+    message: `"${updated.eventName}" (${id}) for ${venueObj.name} was resubmitted in local demo data with status Pending.`,
     type: 'info',
     link: '/applicant/applications',
   });
@@ -570,31 +426,48 @@ export function resubmitBooking(id, updatedFields) {
  * In-App Notification Utilities
  */
 export function getNotifications() {
+  let storage;
+  let raw;
   try {
-    const raw = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+    storage = getStorage();
+    if (!storage) return INITIAL_NOTIFICATIONS;
+    raw = storage.getItem(NOTIFICATIONS_STORAGE_KEY);
     if (!raw) {
-      localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(INITIAL_NOTIFICATIONS));
+      storage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(INITIAL_NOTIFICATIONS));
       return INITIAL_NOTIFICATIONS;
     }
-    return JSON.parse(raw);
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed) || !parsed.every(isNotificationRecord)) {
+      replaceInvalidStoredValue(storage, NOTIFICATIONS_STORAGE_KEY, raw, INITIAL_NOTIFICATIONS);
+      return INITIAL_NOTIFICATIONS;
+    }
+    return parsed;
   } catch {
+    if (storage && raw) replaceInvalidStoredValue(storage, NOTIFICATIONS_STORAGE_KEY, raw, INITIAL_NOTIFICATIONS);
     return INITIAL_NOTIFICATIONS;
   }
 }
 
 export function saveNotifications(notifs) {
+  let storage;
   try {
-    localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifs));
-    window.dispatchEvent(new CustomEvent('coep_notifications_changed', { detail: notifs }));
-  } catch (err) {
-    console.error('Failed to save notifications', err);
+    storage = getStorage();
+  } catch (error) {
+    throw new Error(`Browser storage is unavailable: ${error.message}`, { cause: error });
   }
+  if (!storage) throw new Error('Notification storage is unavailable in this environment.');
+  try {
+    storage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(notifs));
+  } catch (error) {
+    throw new Error(`Could not save notification changes in this browser: ${error.message}`, { cause: error });
+  }
+  window.dispatchEvent(new CustomEvent('coep_notifications_changed', { detail: notifs }));
 }
 
 export function addNotification({ title, message, type = 'info', link = '/applicant/applications' }) {
   const current = getNotifications();
   const item = {
-    id: `notif-${Date.now()}`,
+    id: createUniqueId('notif', new Set(current.map((notification) => notification.id))),
     title,
     message,
     date: new Date().toISOString(),
@@ -603,7 +476,11 @@ export function addNotification({ title, message, type = 'info', link = '/applic
     link,
   };
   const updated = [item, ...current];
-  saveNotifications(updated);
+  try {
+    saveNotifications(updated);
+  } catch (error) {
+    console.error('Booking data was saved, but its notification could not be stored.', error);
+  }
   return item;
 }
 

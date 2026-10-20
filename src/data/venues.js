@@ -1,5 +1,5 @@
 /**
- * @file venuesData.js
+ * @file venues.js
  * Official Catalog of COEP Classroom and Campus Facilities.
  * Exactly 56 official venues:
  *  - Main Auditorium, Mini Auditorium

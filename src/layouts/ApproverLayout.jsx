@@ -12,14 +12,9 @@ import {
   ArrowRightLeft,
 } from 'lucide-react';
 import { Sidebar } from '../components';
+import { useBookings } from '../hooks/useBookingData';
+import { clearDemoSession } from '../services/demoAuth.js';
 import styles from './ApproverLayout.module.css';
-
-const APPROVER_NAV_ITEMS = [
-  { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={19} /> },
-  { id: 'approvals', label: 'Approvals', icon: <CheckSquare size={19} />, badge: 3 },
-  { id: 'venues', label: 'Venues', icon: <Building2 size={19} /> },
-  { id: 'schedule', label: 'Schedule', icon: <CalendarDays size={19} /> },
-];
 
 const NAV_PATHS = {
   overview: '/approver/dashboard',
@@ -31,6 +26,14 @@ const NAV_PATHS = {
 const ApproverLayout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const bookings = useBookings();
+  const pendingCount = bookings.filter((booking) => booking.status === 'Pending').length;
+  const approverNavItems = [
+    { id: 'overview', label: 'Overview', icon: <LayoutDashboard size={19} /> },
+    { id: 'approvals', label: 'Approvals', icon: <CheckSquare size={19} />, badge: pendingCount || undefined },
+    { id: 'venues', label: 'Venues', icon: <Building2 size={19} /> },
+    { id: 'schedule', label: 'Schedule', icon: <CalendarDays size={19} /> },
+  ];
 
   const activeNav = location.pathname.startsWith('/approver/approvals')
     ? 'approvals'
@@ -60,7 +63,8 @@ const ApproverLayout = ({ children }) => {
         type="button"
         className={styles.footerBtn}
         onClick={() => {
-          // Connect sign-out to authentication when it is implemented.
+          clearDemoSession();
+          navigate('/', { replace: true });
         }}
         aria-label="Sign out"
       >
@@ -75,7 +79,7 @@ const ApproverLayout = ({ children }) => {
       <Sidebar
         logoIcon={<ShieldCheck size={22} />}
         logoText="VenueFlow"
-        items={APPROVER_NAV_ITEMS}
+        items={approverNavItems}
         activeId={activeNav}
         onSelect={(id) => {
           if (NAV_PATHS[id]) {
@@ -92,12 +96,13 @@ const ApproverLayout = ({ children }) => {
             <span className={styles.portalBannerText}>
               Viewing as Approver portal
             </span>
+            <span className={styles.demoDataLabel}>Local demo data · this browser only</span>
           </div>
 
           <button
             type="button"
             className={styles.switchPortalBtn}
-            onClick={() => navigate('/applicant/dashboard')}
+            onClick={() => { clearDemoSession(); navigate('/'); }}
             title="Switch to Applicant Portal (Student / Club)"
           >
             <ArrowRightLeft size={14} />

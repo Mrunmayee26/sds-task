@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -13,8 +13,9 @@ import {
 import ApplicantLayout from '../layouts/ApplicantLayout';
 import { GradientButton } from '../components';
 import { getAllVenues } from '../services/bookingService';
-import { VENUE_CATEGORIES } from './sampleData/venuesData';
+import { VENUE_CATEGORIES } from '../data/venues.js';
 import styles from './ApplicantVenues.module.css';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 export default function ApplicantVenues() {
   const navigate = useNavigate();
@@ -23,17 +24,21 @@ export default function ApplicantVenues() {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [activeModalVenue, setActiveModalVenue] = useState(null);
+  const modalRef = useRef(null);
+  const closeButtonRef = useRef(null);
+  const triggerRef = useRef(null);
 
-  // Close modal on Escape key
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') setActiveModalVenue(null);
-    };
-    if (activeModalVenue) {
-      window.addEventListener('keydown', handleKeyDown);
-    }
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeModalVenue]);
+  const openDetails = (venue, event) => {
+    triggerRef.current = event.currentTarget;
+    setActiveModalVenue(venue);
+  };
+
+  useAccessibleDialog(Boolean(activeModalVenue), {
+    containerRef: modalRef,
+    initialFocusRef: closeButtonRef,
+    triggerRef,
+    onClose: () => setActiveModalVenue(null),
+  });
 
   // Filtered venues (Search by venue name and filter by category)
   const filteredVenues = useMemo(() => {
@@ -41,9 +46,8 @@ export default function ApplicantVenues() {
       // Search by venue name
       if (search.trim()) {
         const query = search.toLowerCase().trim();
-        const matchesName = v.name.toLowerCase().includes(query);
-        const matchesCategory = v.category.toLowerCase().includes(query);
-        if (!matchesName && !matchesCategory) return false;
+        const matches = [v.name, v.category, v.location].some((value) => value.toLowerCase().includes(query));
+        if (!matches) return false;
       }
 
       // Filter by category
@@ -178,7 +182,7 @@ export default function ApplicantVenues() {
                     <button
                       type="button"
                       className={styles.detailsBtn}
-                      onClick={() => setActiveModalVenue(v)}
+                      onClick={(event) => openDetails(v, event)}
                     >
                       <Info size={14} />
                       View Details
@@ -207,8 +211,9 @@ export default function ApplicantVenues() {
             aria-modal="true"
             aria-labelledby="venue-modal-title"
           >
-            <div className={styles.modalCard}>
+            <div ref={modalRef} className={styles.modalCard}>
               <button
+                ref={closeButtonRef}
                 type="button"
                 className={styles.closeModalBtn}
                 onClick={() => setActiveModalVenue(null)}

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   CalendarPlus,
@@ -18,8 +18,8 @@ import ApplicantLayout from '../layouts/ApplicantLayout';
 import { StatusBadge, GradientButton } from '../components';
 import {
   CURRENT_APPLICANT,
-  getApplicantBookings,
 } from '../services/bookingService';
+import { useBookings } from '../hooks/useBookingData';
 import styles from './ApplicantDashboard.module.css';
 
 const getTimeGreeting = () => {
@@ -40,18 +40,7 @@ const formatShortDate = (isoDate) => {
 
 export default function ApplicantDashboard() {
   const navigate = useNavigate();
-  const [bookings, setBookings] = useState([]);
-
-  useEffect(() => {
-    const load = () => {
-      setBookings(getApplicantBookings());
-    };
-    load();
-
-    const handler = () => load();
-    window.addEventListener('coep_bookings_changed', handler);
-    return () => window.removeEventListener('coep_bookings_changed', handler);
-  }, []);
+  const bookings = useBookings('applicant');
 
   // Summary counts
   const stats = useMemo(() => {
@@ -63,11 +52,15 @@ export default function ApplicantDashboard() {
   }, [bookings]);
 
   // Upcoming approved or pending events
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const upcomingBookings = useMemo(() => {
     return bookings
       .filter((b) => b.status === 'Approved' || b.status === 'Pending')
+      .filter((b) => !b.date || b.date >= today)
+      .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')) || String(a.startTime || '').localeCompare(String(b.startTime || '')))
       .slice(0, 4);
-  }, [bookings]);
+  }, [bookings, today]);
 
   // Check for rejected booking with reviewer remarks that needs attention
   const rejectedWithRemarks = useMemo(() => {
@@ -75,6 +68,10 @@ export default function ApplicantDashboard() {
       (b) => b.status === 'Rejected' && (b.reviewerNotes || b.previousReviewerNotes)
     );
   }, [bookings]);
+  const recentActivity = useMemo(() => bookings.slice().sort((a, b) => {
+    const latestFor = (booking) => new Date(`${booking.decisionDate || booking.date || ''}T${booking.decisionDate ? '23:59:59' : (booking.startTime || '00:00')}`);
+    return latestFor(b) - latestFor(a);
+  }).slice(0, 4), [bookings]);
 
   return (
     <ApplicantLayout>
@@ -269,7 +266,7 @@ export default function ApplicantDashboard() {
             </div>
 
             <div className={styles.activityTimeline}>
-              {bookings.slice(0, 4).map((item) => {
+              {recentActivity.map((item) => {
                 const dotClass =
                   item.status === 'Approved'
                     ? styles.dot_approved

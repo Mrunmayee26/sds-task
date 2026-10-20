@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -13,18 +13,24 @@ import {
 import ApplicantLayout from '../layouts/ApplicantLayout';
 import { StatusBadge, GradientButton } from '../components';
 import {
-  getApplicantBookings,
   cancelBooking,
   resubmitBooking,
   getAllVenues,
 } from '../services/bookingService';
+import { useBookings } from '../hooks/useBookingData';
 import styles from './ApplicantApplications.module.css';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 const STATUS_TABS = ['All', 'Pending', 'Approved', 'Rejected', 'Cancelled'];
+const getTomorrowDateKey = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+};
 
 export default function ApplicantApplications() {
   const navigate = useNavigate();
-  const [bookings, setBookings] = useState([]);
+  const bookings = useBookings('applicant');
   const [activeTab, setActiveTab] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortOrder, setSortOrder] = useState('newest');
@@ -40,25 +46,32 @@ export default function ApplicantApplications() {
     startTime: '',
     endTime: '',
   });
+  const detailsDialogRef = useRef(null);
+  const detailsCloseRef = useRef(null);
+  const detailsTriggerRef = useRef(null);
+  const resubmitDialogRef = useRef(null);
+  const resubmitCloseRef = useRef(null);
+  const resubmitTriggerRef = useRef(null);
 
   const venues = useMemo(() => getAllVenues(), []);
-
-  // Load and subscribe to updates
-  useEffect(() => {
-    const load = () => {
-      setBookings(getApplicantBookings());
-    };
-    load();
-
-    const handler = () => load();
-    window.addEventListener('coep_bookings_changed', handler);
-    return () => window.removeEventListener('coep_bookings_changed', handler);
-  }, []);
 
   const selectedBooking = useMemo(
     () => (selectedBookingId ? bookings.find((b) => b.id === selectedBookingId) : null),
     [bookings, selectedBookingId]
   );
+
+  useAccessibleDialog(Boolean(selectedBooking), {
+    containerRef: detailsDialogRef,
+    initialFocusRef: detailsCloseRef,
+    triggerRef: detailsTriggerRef,
+    onClose: () => setSelectedBookingId(null),
+  });
+  useAccessibleDialog(Boolean(resubmitTarget), {
+    containerRef: resubmitDialogRef,
+    initialFocusRef: resubmitCloseRef,
+    triggerRef: resubmitTriggerRef,
+    onClose: () => setResubmitTarget(null),
+  });
 
   // Tab counts
   const counts = useMemo(() => {
@@ -102,21 +115,25 @@ export default function ApplicantApplications() {
 
   // Handle Cancellation
   const handleCancel = (booking) => {
-    if (
-      window.confirm(
-        `Are you sure you want to cancel the booking request "${booking.eventName}" (${booking.id})?`
-      )
-    ) {
-      try {
-        cancelBooking(booking.id);
-      } catch (err) {
-        alert(`Failed to cancel: ${err.message}`);
-      }
+    if (!window.confirm(`Are you sure you want to cancel the booking request "${booking.eventName}" (${booking.id})?`)) return false;
+    try {
+      cancelBooking(booking.id);
+      return true;
+    } catch (err) {
+      alert(`Failed to cancel: ${err.message}`);
+      return false;
     }
   };
 
+  const openDetails = (booking, event) => {
+    detailsTriggerRef.current = event.currentTarget;
+    setSelectedBookingId(booking.id);
+  };
+
   // Open Resubmit Modal
-  const openResubmitModal = (booking) => {
+  const openResubmitModal = (booking, event) => {
+    const rowDetailsButton = event?.currentTarget.closest('tr')?.querySelector('button[title="View complete request breakdown"]');
+    resubmitTriggerRef.current = rowDetailsButton || event?.currentTarget || detailsTriggerRef.current;
     setResubmitTarget(booking);
     setResubmitForm({
       venue: booking.venue,
@@ -134,7 +151,7 @@ export default function ApplicantApplications() {
     try {
       resubmitBooking(resubmitTarget.id, resubmitForm);
       setResubmitTarget(null);
-      alert(`Booking ${resubmitTarget.id} resubmitted successfully for review.`);
+      alert(`Booking ${resubmitTarget.id} was saved as Pending in local demo data.`);
     } catch (err) {
       alert(`Resubmission failed: ${err.message}`);
     }
@@ -289,7 +306,7 @@ export default function ApplicantApplications() {
                         <button
                           type="button"
                           className={styles.actionIconBtn}
-                          onClick={() => setSelectedBookingId(b.id)}
+                          onClick={(event) => openDetails(b, event)}
                           title="View complete request breakdown"
                         >
                           View Details
@@ -299,7 +316,7 @@ export default function ApplicantApplications() {
                           <button
                             type="button"
                             className={styles.resubmitActionBtn}
-                            onClick={() => openResubmitModal(b)}
+                            onClick={(event) => openResubmitModal(b, event)}
                             title="Resubmit this booking with new time or venue"
                           >
                             <RotateCcw size={13} style={{ display: 'inline', marginRight: 4 }} />
@@ -307,7 +324,7 @@ export default function ApplicantApplications() {
                           </button>
                         )}
 
-                        {(b.status === 'Pending' || b.status === 'Approved') && (
+                        {b.status === 'Pending' && (
                           <button
                             type="button"
                             className={styles.cancelActionBtn}
@@ -334,7 +351,7 @@ export default function ApplicantApplications() {
             aria-modal="true"
             aria-labelledby="drawer-title"
           >
-            <div className={styles.drawerPanel}>
+            <div ref={detailsDialogRef} className={styles.drawerPanel}>
               <div className={styles.drawerHeader}>
                 <div className={styles.drawerTitleGroup}>
                   <span className={styles.idBadge}>{selectedBooking.id}</span>
@@ -344,6 +361,7 @@ export default function ApplicantApplications() {
                 </div>
 
                 <button
+                  ref={detailsCloseRef}
                   type="button"
                   className={styles.closeDrawerBtn}
                   onClick={() => setSelectedBookingId(null)}
@@ -408,7 +426,7 @@ export default function ApplicantApplications() {
                   <div className={styles.reviewerNoteBox} role="alert">
                     <span className={styles.reviewerNoteTitle}>
                       <AlertCircle size={15} />
-                      Academic Reviewer Remarks ({selectedBooking.decisionBy || 'Faculty'}):
+                      Review note ({selectedBooking.decisionBy || 'Approver'}):
                     </span>
                     <p className={styles.reviewerNoteText}>
                       &ldquo;
@@ -425,10 +443,10 @@ export default function ApplicantApplications() {
                   <div className={styles.slipPreviewBox}>
                     <div>
                       <strong style={{ color: '#065F46', display: 'block', fontSize: '14px' }}>
-                        Official Booking Confirmed
+                        Marked Approved in Demo Data
                       </strong>
                       <span style={{ fontSize: '12px', color: '#047857' }}>
-                        Approved by {selectedBooking.decisionBy || 'Academic Affairs'}.
+                        Demo approval recorded by {selectedBooking.decisionBy || 'Approver'}.
                       </span>
                     </div>
 
@@ -539,13 +557,12 @@ export default function ApplicantApplications() {
                   </button>
                 )}
 
-                {(selectedBooking.status === 'Pending' || selectedBooking.status === 'Approved') && (
+                {selectedBooking.status === 'Pending' && (
                   <button
                     type="button"
                     className={styles.cancelActionBtn}
                     onClick={() => {
-                      handleCancel(selectedBooking);
-                      setSelectedBookingId(null);
+                      if (handleCancel(selectedBooking)) setSelectedBookingId(null);
                     }}
                   >
                     <Ban size={14} style={{ display: 'inline', marginRight: 4 }} />
@@ -574,7 +591,7 @@ export default function ApplicantApplications() {
             aria-labelledby="resubmit-modal-title"
             style={{ justifyContent: 'center', alignItems: 'center' }}
           >
-            <div className={styles.resubmitModalCard}>
+            <div ref={resubmitDialogRef} className={styles.resubmitModalCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div>
                   <h2 id="resubmit-modal-title" style={{ fontSize: '18px', fontWeight: 'bold' }}>
@@ -585,6 +602,7 @@ export default function ApplicantApplications() {
                   </span>
                 </div>
                 <button
+                  ref={resubmitCloseRef}
                   type="button"
                   className={styles.closeDrawerBtn}
                   onClick={() => setResubmitTarget(null)}
@@ -603,7 +621,7 @@ export default function ApplicantApplications() {
                   >
                     {venues.map((v) => (
                       <option key={v.id} value={v.name}>
-                        {v.name} (Cap: {v.capacity})
+                        {v.name} ({typeof v.capacity === 'number' ? `Capacity: ${v.capacity}` : 'capacity details unavailable'})
                       </option>
                     ))}
                   </select>
@@ -613,6 +631,7 @@ export default function ApplicantApplications() {
                   <label style={{ fontSize: '13px', fontWeight: 600 }}>New Booking Date</label>
                   <input
                     type="date"
+                    min={getTomorrowDateKey()}
                     value={resubmitForm.date}
                     onChange={(e) => setResubmitForm((p) => ({ ...p, date: e.target.value }))}
                     style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #DFDCE8' }}

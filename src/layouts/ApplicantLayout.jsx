@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import {
@@ -16,42 +16,18 @@ import {
 import { Sidebar } from '../components';
 import {
   CURRENT_APPLICANT,
-  getApplicantBookings,
-  getNotifications,
 } from '../services/bookingService';
+import { useBookings, useNotifications } from '../hooks/useBookingData';
+import { clearDemoSession } from '../services/demoAuth.js';
 import styles from './ApplicantLayout.module.css';
 
 const ApplicantLayout = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [pendingCount, setPendingCount] = useState(0);
-  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
-
-  // Sync pending count & unread notifications
-  useEffect(() => {
-    const updateCounts = () => {
-      const myBookings = getApplicantBookings();
-      const pending = myBookings.filter((b) => b.status === 'Pending').length;
-      setPendingCount(pending);
-
-      const notifs = getNotifications();
-      const unread = notifs.filter((n) => !n.read).length;
-      setUnreadNotifCount(unread);
-    };
-
-    updateCounts();
-
-    const handleBookingsChanged = () => updateCounts();
-    const handleNotifsChanged = () => updateCounts();
-
-    window.addEventListener('coep_bookings_changed', handleBookingsChanged);
-    window.addEventListener('coep_notifications_changed', handleNotifsChanged);
-
-    return () => {
-      window.removeEventListener('coep_bookings_changed', handleBookingsChanged);
-      window.removeEventListener('coep_notifications_changed', handleNotifsChanged);
-    };
-  }, []);
+  const bookings = useBookings('applicant');
+  const notifications = useNotifications();
+  const pendingCount = useMemo(() => bookings.filter((booking) => booking.status === 'Pending').length, [bookings]);
+  const unreadNotifCount = useMemo(() => notifications.filter((notification) => !notification.read).length, [notifications]);
 
   const navItems = [
     {
@@ -113,7 +89,7 @@ const ApplicantLayout = ({ children }) => {
       <button
         type="button"
         className={styles.footerBtn}
-        onClick={() => navigate('/approver/dashboard')}
+        onClick={() => { clearDemoSession(); navigate('/'); }}
         aria-label="Switch to Approver Portal"
         title="View system as Approver (Faculty / Academic Affairs)"
       >
@@ -126,7 +102,8 @@ const ApplicantLayout = ({ children }) => {
         className={styles.footerBtn}
         onClick={() => {
           if (window.confirm('Sign out of COEP Venue Booking System?')) {
-            navigate('/applicant/dashboard');
+            clearDemoSession();
+            navigate('/', { replace: true });
           }
         }}
         aria-label="Sign out"
@@ -160,6 +137,7 @@ const ApplicantLayout = ({ children }) => {
             <span className={styles.portalBannerText}>
               Viewing as Applicant Portal
             </span>
+            <span className={styles.demoDataLabel}>Local demo data · this browser only</span>
             <span className={styles.bannerSubText}>
               • {CURRENT_APPLICANT.club} ({CURRENT_APPLICANT.name})
             </span>
@@ -169,7 +147,7 @@ const ApplicantLayout = ({ children }) => {
             <button
               type="button"
               className={styles.switchPortalBtn}
-              onClick={() => navigate('/approver/dashboard')}
+              onClick={() => { clearDemoSession(); navigate('/'); }}
               title="Test role switching between Applicant and Approver"
             >
               <ArrowRightLeft size={14} />

@@ -1,14 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Building2, MapPin, Users, Search, X, CalendarDays, Wifi, Projector, Snowflake, Check } from 'lucide-react';
 import { StatusBadge } from '../components';
 import ApproverLayout from '../layouts/ApproverLayout';
-import { SAMPLE_APPROVER_VENUES } from './sampleData/approverVenues.sample';
+import { COEP_VENUES, VENUE_CATEGORIES } from '../data/venues.js';
+import { SAMPLE_VENUE_BOOKINGS, SAMPLE_VENUE_STATUS_BY_ID } from '../data/demo/approverVenues.js';
 import styles from './ApproverVenues.module.css';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
-const VENUE_TYPES = ['Classroom', 'Seminar Hall', 'Auditorium', 'Laboratory'];
-const AVAILABILITY = ['All', 'Available', 'In Use', 'Unavailable'];
-const STATUS_CLASS = { Available: 'available', 'In Use': 'inUse', Unavailable: 'unavailable' };
+const AVAILABILITY = ['All statuses', 'Available', 'In Use', 'Unavailable', 'Not provided'];
+const ALL_VENUE_CATEGORIES = 'All Categories';
 
 const FacilityIcon = ({ facility }) => {
   const value = facility.toLowerCase();
@@ -19,18 +20,18 @@ const FacilityIcon = ({ facility }) => {
 };
 FacilityIcon.propTypes = { facility: PropTypes.string.isRequired };
 
-const VenueStatus = ({ status }) => (
-  <span className={`${styles.status} ${styles[STATUS_CLASS[status]] || ''}`}>
-    <span aria-hidden="true" />{status}
-  </span>
-);
-VenueStatus.propTypes = { status: PropTypes.string.isRequired };
-
 export default function ApproverVenues({ venues }) {
-  const venueData = venues === undefined ? SAMPLE_APPROVER_VENUES : venues;
+  const isSampleData = venues === undefined;
+  const venueData = useMemo(() => (venues === undefined
+    ? COEP_VENUES.map((venue) => ({
+      ...venue,
+      status: SAMPLE_VENUE_STATUS_BY_ID[venue.id] || 'Not provided',
+      bookings: SAMPLE_VENUE_BOOKINGS[venue.id] || [],
+    }))
+    : venues), [venues]);
   const [query, setQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState('All types');
-  const [availabilityFilter, setAvailabilityFilter] = useState('All');
+  const [typeFilter, setTypeFilter] = useState(ALL_VENUE_CATEGORIES);
+  const [availabilityFilter, setAvailabilityFilter] = useState('All statuses');
   const [selectedId, setSelectedId] = useState(null);
   const drawerRef = useRef(null);
   const closeButtonRef = useRef(null);
@@ -42,44 +43,31 @@ export default function ApproverVenues({ venues }) {
     inUse: venueData.filter((venue) => venue.status === 'In Use').length,
     unavailable: venueData.filter((venue) => venue.status === 'Unavailable').length,
   }), [venueData]);
+  const categoryOptions = useMemo(() => [ALL_VENUE_CATEGORIES, ...new Set([
+    ...VENUE_CATEGORIES.filter((category) => category !== ALL_VENUE_CATEGORIES),
+    ...venueData.map((venue) => venue.category).filter(Boolean),
+  ])], [venueData]);
 
   const visibleVenues = useMemo(() => {
     const term = query.trim().toLowerCase();
     return venueData.filter((venue) => {
-      const matchesQuery = !term || [venue.name, venue.location, venue.building]
+      const matchesQuery = !term || [venue.name, venue.location, venue.category]
         .some((value) => String(value || '').toLowerCase().includes(term));
-      const matchesType = typeFilter === 'All types' || venue.type === typeFilter;
-      const matchesAvailability = availabilityFilter === 'All' || venue.status === availabilityFilter;
+      const matchesType = typeFilter === ALL_VENUE_CATEGORIES || venue.category === typeFilter;
+      const matchesAvailability = availabilityFilter === 'All statuses'
+        || (availabilityFilter === 'Not provided' ? !AVAILABILITY.slice(1, 4).includes(venue.status) : venue.status === availabilityFilter);
       return matchesQuery && matchesType && matchesAvailability;
     });
   }, [venueData, query, typeFilter, availabilityFilter]);
 
   const selectedVenue = venueData.find((venue) => venue.id === selectedId);
 
-  useEffect(() => {
-    if (!selectedVenue) return undefined;
-    closeButtonRef.current?.focus();
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setSelectedId(null);
-      if (event.key !== 'Tab') return;
-      const focusable = drawerRef.current?.querySelectorAll('button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled)');
-      if (!focusable?.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      triggerRef.current?.focus();
-    };
-  }, [selectedVenue]);
+  useAccessibleDialog(Boolean(selectedVenue), {
+    containerRef: drawerRef,
+    initialFocusRef: closeButtonRef,
+    triggerRef,
+    onClose: () => setSelectedId(null),
+  });
 
   const openDetails = (venue, event) => {
     triggerRef.current = event.currentTarget;
@@ -88,8 +76,8 @@ export default function ApproverVenues({ venues }) {
 
   const clearFilters = () => {
     setQuery('');
-    setTypeFilter('All types');
-    setAvailabilityFilter('All');
+    setTypeFilter(ALL_VENUE_CATEGORIES);
+    setAvailabilityFilter('All statuses');
   };
 
   return (
@@ -113,7 +101,7 @@ export default function ApproverVenues({ venues }) {
 
         <section className={styles.venueSection} aria-labelledby="venue-list-title">
           <div className={styles.sectionHeading}>
-            <div><h2 id="venue-list-title">Campus venues</h2><p>Availability shown here is sample development data.</p></div>
+            <div><h2 id="venue-list-title">Campus venues</h2><p>{isSampleData ? 'Availability and bookings shown are sample development data.' : 'Venue specifications and availability provided to this page.'}</p></div>
             <span className={styles.resultCount}>{visibleVenues.length} {visibleVenues.length === 1 ? 'venue' : 'venues'}</span>
           </div>
           <div className={styles.toolbar}>
@@ -125,7 +113,7 @@ export default function ApproverVenues({ venues }) {
             <label className={styles.selectLabel}>
               <span className={styles.visuallyHidden}>Filter by venue type</span>
               <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
-                <option>All types</option>{VENUE_TYPES.map((type) => <option key={type}>{type}</option>)}
+                {categoryOptions.map((type) => <option key={type}>{type}</option>)}
               </select>
             </label>
             <label className={styles.selectLabel}>
@@ -139,8 +127,8 @@ export default function ApproverVenues({ venues }) {
           {visibleVenues.length === 0 ? (
             <div className={styles.emptyState}>
               <Search size={22} aria-hidden="true" />
-              <h3>No venues found</h3>
-              <p>Try a different search or clear your filters to see all venues.</p>
+              <h3>{venueData.length ? 'No venues found' : 'No venue data available'}</h3>
+              <p>{venueData.length ? 'Try a different search or clear your filters to see all venues.' : 'No venues were provided to this page.'}</p>
               <button type="button" className={styles.clearButton} onClick={clearFilters}>Clear search and filters</button>
             </div>
           ) : (
@@ -148,13 +136,13 @@ export default function ApproverVenues({ venues }) {
               {visibleVenues.map((venue) => (
                 <article className={styles.venueCard} key={venue.id}>
                   <button type="button" className={styles.cardSurface} onClick={(event) => openDetails(venue, event)} aria-label={`View details for ${venue.name}`}>
-                    <div className={styles.cardTopline}><span className={styles.typeTag}>{venue.type}</span><VenueStatus status={venue.status} /></div>
+                    <div className={styles.cardTopline}><span className={styles.typeTag}>{venue.category}</span><StatusBadge status={venue.status || 'Not provided'} size="sm" /></div>
                     <h3>{venue.name}</h3>
-                    <p className={styles.location}><MapPin size={14} aria-hidden="true" />{venue.building} · {venue.location}</p>
-                    <div className={styles.capacity}><Users size={15} aria-hidden="true" /><span>Capacity</span><strong>{venue.capacity}</strong></div>
+                    <p className={styles.location}><MapPin size={14} aria-hidden="true" />{venue.location || 'Location details not available'}</p>
+                    <div className={styles.capacity}><Users size={15} aria-hidden="true" /><span>Capacity</span><strong>{typeof venue.capacity === 'number' ? `${venue.capacity} people` : 'Details not available'}</strong></div>
                     <div className={styles.facilityList} aria-label="Facilities">
-                      {venue.facilities.slice(0, 4).map((facility) => <span key={facility}><FacilityIcon facility={facility} />{facility}</span>)}
-                      {venue.facilities.length > 4 && <small>+{venue.facilities.length - 4} more</small>}
+                      {venue.amenities?.length ? venue.amenities.slice(0, 4).map((facility) => <span key={facility}><FacilityIcon facility={facility} />{facility}</span>) : <small>Details not available</small>}
+                      {(venue.amenities?.length || 0) > 4 && <small>+{venue.amenities.length - 4} more</small>}
                     </div>
                   </button>
                   <div className={styles.cardFooter}>
@@ -177,29 +165,37 @@ export default function ApproverVenues({ venues }) {
               <button ref={closeButtonRef} type="button" className={styles.closeButton} onClick={() => setSelectedId(null)} aria-label="Close venue details"><X size={19} /></button>
             </div>
             <div className={styles.drawerBody}>
-              <div className={styles.detailLocation}><MapPin size={16} aria-hidden="true" /><div><strong>{selectedVenue.building}</strong><span>{selectedVenue.location}</span></div></div>
+              <div className={styles.detailLocation}><MapPin size={16} aria-hidden="true" /><div><strong>{selectedVenue.location || 'Location details not available'}</strong><span>{selectedVenue.name}</span></div></div>
               <div className={styles.detailMeta}>
-                <div><span>Capacity</span><strong>{selectedVenue.capacity} people</strong></div>
-                <div><span>Venue type</span><strong>{selectedVenue.type}</strong></div>
+                <div><span>Capacity</span><strong>{typeof selectedVenue.capacity === 'number' ? `${selectedVenue.capacity} people` : 'Details not available'}</strong></div>
+                <div><span>Venue type</span><strong>{selectedVenue.category}</strong></div>
               </div>
               <section className={styles.detailSection}>
+                <h3>Description</h3>
+                <p className={styles.noBookings}>{selectedVenue.description || 'Details not available'}</p>
+              </section>
+              <section className={styles.detailSection}>
                 <h3>Availability</h3>
-                <p className={styles.sampleNote}>Sample status for development preview</p>
-                <VenueStatus status={selectedVenue.status} />
+                {isSampleData && <p className={styles.sampleNote}>Sample status for development preview</p>}
+                <StatusBadge status={selectedVenue.status || 'Not provided'} size="sm" />
               </section>
               <section className={styles.detailSection}>
                 <h3>Facilities</h3>
-                <div className={styles.detailFacilities}>{selectedVenue.facilities.map((facility) => <span key={facility}><FacilityIcon facility={facility} />{facility}</span>)}</div>
+                {selectedVenue.amenities?.length ? <div className={styles.detailFacilities}>{selectedVenue.amenities.map((facility) => <span key={facility}><FacilityIcon facility={facility} />{facility}</span>)}</div> : <p className={styles.noBookings}>Details not available</p>}
+              </section>
+              <section className={styles.detailSection}>
+                <h3>Rules</h3>
+                <p className={styles.noBookings}>{selectedVenue.rules || 'Details not available'}</p>
               </section>
               <section className={styles.detailSection}>
                 <div className={styles.bookingHeading}><h3>Booking schedule</h3><span>Sample bookings</span></div>
-                {selectedVenue.bookings.length === 0 ? (
+                {!(selectedVenue.bookings || []).length ? (
                   <p className={styles.noBookings}>No sample bookings are listed for this venue.</p>
                 ) : (
                   <ul className={styles.bookingList}>
-                    {selectedVenue.bookings.map((booking) => (
+                    {(selectedVenue.bookings || []).map((booking) => (
                       <li key={booking.id}>
-                        <div className={styles.bookingDate}><CalendarDays size={14} aria-hidden="true" /><span>{booking.date}</span><time>{booking.time}</time></div>
+                        <div className={styles.bookingDate}><CalendarDays size={14} aria-hidden="true" /><span>{booking.date}</span><time>{booking.startTime}–{booking.endTime}</time></div>
                         <strong>{booking.event}</strong>
                         <StatusBadge status={booking.status} size="sm" />
                       </li>
@@ -219,17 +215,19 @@ ApproverVenues.propTypes = {
   venues: PropTypes.arrayOf(PropTypes.shape({
     id: PropTypes.string.isRequired,
     name: PropTypes.string.isRequired,
-    building: PropTypes.string.isRequired,
-    location: PropTypes.string.isRequired,
-    capacity: PropTypes.number.isRequired,
-    type: PropTypes.string.isRequired,
-    facilities: PropTypes.arrayOf(PropTypes.string).isRequired,
-    status: PropTypes.oneOf(AVAILABILITY.slice(1)).isRequired,
+    category: PropTypes.string,
+    location: PropTypes.string,
+    capacity: PropTypes.number,
+    amenities: PropTypes.arrayOf(PropTypes.string),
+    description: PropTypes.string,
+    rules: PropTypes.string,
+    status: PropTypes.string,
     bookings: PropTypes.arrayOf(PropTypes.shape({
       id: PropTypes.string.isRequired,
       event: PropTypes.string.isRequired,
       date: PropTypes.string.isRequired,
-      time: PropTypes.string.isRequired,
+      startTime: PropTypes.string.isRequired,
+      endTime: PropTypes.string.isRequired,
       status: PropTypes.string.isRequired,
     })).isRequired,
   })),

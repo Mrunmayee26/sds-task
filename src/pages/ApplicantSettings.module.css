@@ -123,6 +123,12 @@
   font-weight: 500;
 }
 
+.preferencesSection { padding-top: 16px; border-top: 1px solid var(--color-border-subtle); }
+.preferencesTitle { margin-bottom: 6px; color: var(--color-text-primary); font-size: 13px; font-weight: var(--font-weight-bold); }
+.demoNote { margin-bottom: 12px; color: var(--color-text-muted); font-size: 11px; line-height: 1.5; }
+.preferenceOption { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; color: var(--color-text-secondary); font-size: 12px; cursor: pointer; }
+.preferenceOption input { width: 16px; height: 16px; accent-color: var(--color-accent-purple); }
+
 /* ── Notifications Center ──────────────────────────────────────────────── */
 .notifHeader {
   display: flex;
@@ -152,6 +158,9 @@
 }
 
 .notifItem {
+  width: 100%;
+  color: inherit;
+  text-align: left;
   padding: 14px 16px;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-subtle);
@@ -162,6 +171,9 @@
   transition: all 0.2s ease;
   position: relative;
 }
+
+.notifItem:focus-visible { outline: 2px solid var(--color-border-focus); outline-offset: 2px; }
+.emptyNotifications { padding: 30px 0; color: var(--color-text-secondary); text-align: center; font-size: 12px; }
 
 .notifUnread {
   background: #FAF8FF;

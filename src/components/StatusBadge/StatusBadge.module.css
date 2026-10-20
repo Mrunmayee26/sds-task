@@ -50,6 +50,23 @@
   border: 1px solid rgba(217, 119, 6, 0.25);
 }
 
+.inUse {
+  background: #FFF3E3;
+  color: #8B4A08;
+  border: 1px solid rgba(169, 93, 13, 0.18);
+}
+
+.unavailable {
+  background: #FFF0F2;
+  color: #8E263A;
+  border: 1px solid rgba(164, 62, 83, 0.16);
+}
+
+.approved { color: #1F7855; background: #E9F7EF; }
+.rejected { color: #8E263A; background: #FFF0F2; }
+.cancelled { color: var(--color-text-secondary); background: #F1F0F5; }
+.completed { color: var(--color-accent-purple); background: var(--color-accent-purple-light); }
+
 .approved {
   background: #ECFDF5;
   color: #065F46;

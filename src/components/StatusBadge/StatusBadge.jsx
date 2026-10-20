@@ -19,8 +19,10 @@ const StatusBadge = ({
     statusClass = styles.booked;
   } else if (normalizedStatus === 'free' || normalizedStatus === 'available') {
     statusClass = styles.free;
-  } else if (normalizedStatus === 'pending') {
-    statusClass = styles.pending;
+  } else if (normalizedStatus === 'in use') {
+    statusClass = styles.inUse;
+  } else if (normalizedStatus === 'unavailable') {
+    statusClass = styles.unavailable;
   } else if (normalizedStatus === 'approved') {
     statusClass = styles.approved;
   } else if (normalizedStatus === 'rejected') {
@@ -29,6 +31,8 @@ const StatusBadge = ({
     statusClass = styles.cancelled;
   } else if (normalizedStatus === 'completed') {
     statusClass = styles.completed;
+  } else if (normalizedStatus === 'pending') {
+    statusClass = styles.pending;
   }
 
   const badgeClasses = [

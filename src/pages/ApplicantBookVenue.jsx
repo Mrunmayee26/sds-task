@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   CalendarPlus,
@@ -22,6 +22,7 @@ import {
   createBooking,
 } from '../services/bookingService';
 import styles from './ApplicantBookVenue.module.css';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 const EVENT_TYPES = [
   'Workshop',
@@ -53,6 +54,15 @@ const getTodayDateStr = () => {
   return `${year}-${month}-${day}`;
 };
 
+const getTomorrowDateStr = () => {
+  const date = new Date();
+  date.setDate(date.getDate() + 1);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 export default function ApplicantBookVenue() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -66,7 +76,7 @@ export default function ApplicantBookVenue() {
     eventType: 'Workshop',
     purpose: '',
     venue: queryVenue || (venues[0]?.name ?? 'Main Auditorium'),
-    date: getTodayDateStr(),
+    date: getTomorrowDateStr(),
     startTime: '10:00',
     endTime: '13:00',
     attendance: '40',
@@ -82,7 +92,19 @@ export default function ApplicantBookVenue() {
   const [errors, setErrors] = useState({});
   const [submittedBooking, setSubmittedBooking] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const submitLockRef = useRef(false);
+  const confirmationRef = useRef(null);
+  const confirmationFocusRef = useRef(null);
+  const submitTriggerRef = useRef(null);
   const [prevQueryVenue, setPrevQueryVenue] = useState(queryVenue);
+
+  useAccessibleDialog(Boolean(submittedBooking), {
+    containerRef: confirmationRef,
+    initialFocusRef: confirmationFocusRef,
+    triggerRef: submitTriggerRef,
+    onClose: () => setSubmittedBooking(null),
+  });
 
   if (queryVenue !== prevQueryVenue) {
     setPrevQueryVenue(queryVenue);
@@ -96,8 +118,8 @@ export default function ApplicantBookVenue() {
     return getVenueById(formData.venue);
   }, [formData.venue]);
 
-  // Live conflict detection
-  const liveConflict = useMemo(() => {
+  // Check only this browser's demo bookings; the backend must own authoritative availability.
+  const localConflict = useMemo(() => {
     if (!formData.venue || !formData.date || !formData.startTime || !formData.endTime) {
       return null;
     }
@@ -135,9 +157,16 @@ export default function ApplicantBookVenue() {
 
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setFormData((prev) => ({ ...prev, supportingDocument: file.name }));
+    if (!file) return;
+    const allowedExtensions = ['.pdf', '.png', '.jpg', '.jpeg', '.docx'];
+    const extension = `.${file.name.split('.').pop().toLowerCase()}`;
+    if (!allowedExtensions.includes(extension) || file.size > 5 * 1024 * 1024) {
+      setSubmitError('Choose a PDF, image, or DOCX file under 5 MB.');
+      e.target.value = '';
+      return;
     }
+    setSubmitError('');
+    setFormData((prev) => ({ ...prev, supportingDocument: file.name }));
   };
 
   // Form Validation
@@ -159,6 +188,9 @@ export default function ApplicantBookVenue() {
     if (!formData.endTime) {
       newErrors.endTime = 'End time is required.';
     }
+    if (!formData.date || formData.date <= getTodayDateStr()) {
+      newErrors.date = 'Choose a future booking date.';
+    }
     if (formData.startTime && formData.endTime && formData.startTime >= formData.endTime) {
       newErrors.endTime = 'End time must be after start time.';
     }
@@ -166,11 +198,11 @@ export default function ApplicantBookVenue() {
     const attendanceNum = Number(formData.attendance);
     if (!formData.attendance || isNaN(attendanceNum) || attendanceNum <= 0) {
       newErrors.attendance = 'Enter valid attendance count.';
-    } else if (selectedVenueObj && attendanceNum > selectedVenueObj.capacity) {
+    } else if (selectedVenueObj && typeof selectedVenueObj.capacity === 'number' && attendanceNum > selectedVenueObj.capacity) {
       newErrors.attendance = `Exceeds ${selectedVenueObj.name} capacity (${selectedVenueObj.capacity} seats).`;
     }
 
-    if (!formData.email.trim() || !formData.email.includes('@')) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       newErrors.email = 'Valid college email is required.';
     }
     if (!formData.phone.trim()) {
@@ -183,24 +215,29 @@ export default function ApplicantBookVenue() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    submitTriggerRef.current = e.nativeEvent?.submitter || e.currentTarget;
+    if (submitLockRef.current) return;
+    setSubmitError('');
 
     if (!validateForm()) {
       window.scrollTo({ top: 100, behavior: 'smooth' });
       return;
     }
 
-    if (liveConflict?.hasConflict) {
-      alert(`Cannot submit booking: ${liveConflict.message}`);
+    if (localConflict?.hasConflict) {
+      setSubmitError(`Cannot submit booking: ${localConflict.message}`);
       return;
     }
 
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       const created = createBooking(formData);
       setSubmittedBooking(created);
     } catch (err) {
-      alert(`Booking submission failed: ${err.message}`);
+      setSubmitError(err.message || 'Booking submission failed. Please try again.');
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -211,8 +248,7 @@ export default function ApplicantBookVenue() {
         <header className={styles.pageHeader}>
           <h1 className={styles.title}>Book a Campus Venue</h1>
           <p className={styles.subtitle}>
-            Submit an official reservation request for academic rooms, computer labs, or seminar halls.
-            Requests are reviewed and approved by Academic Affairs.
+            Save a booking request in this browser&apos;s local demo data. Backend submission and review are not connected.
           </p>
         </header>
 
@@ -299,7 +335,7 @@ export default function ApplicantBookVenue() {
                 >
                   {venues.map((v) => (
                     <option key={v.id} value={v.name}>
-                      {v.name} (Cap: {v.capacity} • {v.building})
+                  {v.name} ({typeof v.capacity === 'number' ? `Capacity: ${v.capacity}` : 'capacity details unavailable'} · {v.location})
                     </option>
                   ))}
                 </select>
@@ -307,7 +343,9 @@ export default function ApplicantBookVenue() {
                 {selectedVenueObj && (
                   <div className={styles.venueCapacityHint}>
                     <Users size={13} />
-                    Maximum Seating Capacity: {selectedVenueObj.capacity} seats ({selectedVenueObj.floor})
+                    {typeof selectedVenueObj.capacity === 'number'
+                      ? `Maximum seating capacity: ${selectedVenueObj.capacity} seats.`
+                      : `Capacity details for ${selectedVenueObj.name} have not been provided.`}
                   </div>
                 )}
               </div>
@@ -321,7 +359,7 @@ export default function ApplicantBookVenue() {
                   name="attendance"
                   type="number"
                   min="1"
-                  max={selectedVenueObj?.capacity || 1000}
+                  max={typeof selectedVenueObj?.capacity === 'number' ? selectedVenueObj.capacity : undefined}
                   placeholder="e.g. 50"
                   value={formData.attendance}
                   onChange={handleChange}
@@ -338,7 +376,7 @@ export default function ApplicantBookVenue() {
                   id="date"
                   name="date"
                   type="date"
-                  min={getTodayDateStr()}
+                min={getTomorrowDateStr()}
                   value={formData.date}
                   onChange={handleChange}
                   className={`${styles.inputField} ${errors.date ? styles.inputError : ''}`}
@@ -378,20 +416,20 @@ export default function ApplicantBookVenue() {
                 </div>
               </div>
 
-              {/* Live Conflict Alert Banner */}
+              {/* Local demo overlap check */}
               <div className={styles.fullWidth}>
-                {liveConflict?.hasConflict ? (
+                {localConflict?.hasConflict ? (
                   <div className={styles.conflictAlert} role="alert">
                     <ShieldAlert size={20} style={{ flexShrink: 0, marginTop: 2 }} />
                     <div>
-                      <strong>Reservation Conflict Warning:</strong>
-                      <div>{liveConflict.message}</div>
+                      <strong>Local demo overlap warning:</strong>
+                      <div>{localConflict.message}</div>
                     </div>
                   </div>
                 ) : (
                   <div className={styles.availSuccess}>
                     <CheckCircle2 size={16} />
-                    <span>Venue schedule is clear for this selected date and timeslot.</span>
+                    <span>No overlapping booking was found in this browser&apos;s demo data.</span>
                   </div>
                 )}
               </div>
@@ -524,7 +562,7 @@ export default function ApplicantBookVenue() {
                 <span className={styles.uploadText}>
                   Click or drag file to attach event brochure / proposal PDF
                 </span>
-                <span className={styles.uploadSubtext}>Supported formats: PDF, PNG, DOCX (Max 5MB)</span>
+                <span className={styles.uploadSubtext}>PDF, PNG, JPG, or DOCX · up to 5 MB. Demo only stores the filename; it does not upload the file.</span>
                 <input
                   type="file"
                   accept=".pdf,.png,.jpg,.docx"
@@ -551,6 +589,7 @@ export default function ApplicantBookVenue() {
           </div>
 
           {/* Form Actions */}
+          {submitError && <p className={styles.errorText} role="alert">{submitError}</p>}
           <div className={styles.formActionsRow}>
             <button
               type="button"
@@ -568,7 +607,7 @@ export default function ApplicantBookVenue() {
               type="submit"
               size="lg"
               variant="solid"
-              disabled={isSubmitting || liveConflict?.hasConflict}
+              disabled={isSubmitting || localConflict?.hasConflict}
             >
               <CalendarPlus size={18} style={{ marginRight: 8 }} />
               {isSubmitting ? 'Submitting Request...' : 'Submit Booking Request'}
@@ -584,7 +623,7 @@ export default function ApplicantBookVenue() {
             aria-modal="true"
             aria-labelledby="success-modal-title"
           >
-            <div className={styles.successModalCard}>
+            <div ref={confirmationRef} className={styles.successModalCard}>
               <div className={styles.successIconCircle}>
                 <CheckCircle2 size={36} />
               </div>
@@ -594,9 +633,8 @@ export default function ApplicantBookVenue() {
               </h2>
 
               <p className={styles.successDesc}>
-                Your reservation request for <strong>{submittedBooking.eventName}</strong> has been
-                successfully created. It has been routed to Academic Affairs with a status of{' '}
-                <strong>Pending</strong>.
+                <strong>{submittedBooking.eventName}</strong> was saved in this browser&apos;s demo data with a
+                status of <strong>Pending</strong>. No request was sent to Academic Affairs.
               </p>
 
               <div className={styles.receiptBox}>
@@ -620,12 +658,13 @@ export default function ApplicantBookVenue() {
                 </div>
                 <div className={styles.receiptRow}>
                   <span>Current Status:</span>
-                  <strong style={{ color: '#D97706' }}>Pending Review</strong>
+                  <strong style={{ color: '#D97706' }}>Pending (demo)</strong>
                 </div>
               </div>
 
               <div className={styles.modalActions}>
                 <button
+                  ref={confirmationFocusRef}
                   type="button"
                   className={styles.resetBtn}
                   onClick={() => {

@@ -82,6 +82,7 @@
   color: var(--color-accent-purple);
   letter-spacing: 0.2px;
 }
+.demoDataLabel { color: var(--color-text-muted); font-size: 10px; }
 
 /* ── Scrollable main content ────────────────────────────────────────────── */
 .mainContent {
@@ -151,6 +152,8 @@
   .portalBanner {
     padding: 10px 20px;
   }
+
+  .demoDataLabel { display: none; }
 
   /* Hide the footer button text labels when sidebar is in icon-only mode */
   .footerBtnLabel {

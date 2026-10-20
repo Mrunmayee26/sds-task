@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   CalendarDays,
@@ -12,10 +12,11 @@ import {
   X,
   XCircle,
 } from 'lucide-react';
-import { GradientButton } from '../components';
+import { GradientButton, StatusBadge } from '../components';
 import ApproverLayout from '../layouts/ApproverLayout';
-import { SAMPLE_APPROVAL_REQUESTS } from './sampleData/approverApprovals.sample';
+import { SAMPLE_APPROVAL_REQUESTS } from '../data/demo/approverApprovals.js';
 import styles from './ApproverApprovals.module.css';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 const getLocalDate = () => {
   const now = new Date();
@@ -37,14 +38,6 @@ const formatDate = (value) => {
     day: 'numeric', month: 'short', year: 'numeric',
   }).format(date);
 };
-
-const RequestStatus = ({ status }) => (
-  <span className={`${styles.status} ${styles[`status${status}`] || ''}`}>
-    <span className={styles.statusDot} aria-hidden="true" />{status}
-  </span>
-);
-
-RequestStatus.propTypes = { status: PropTypes.string.isRequired };
 
 const ApproverApprovals = ({
   requests,
@@ -96,35 +89,12 @@ const ApproverApprovals = ({
       ? 'Availability conflict found'
       : 'Availability check passed';
 
-  useEffect(() => {
-    if (!selectedId || !hasSelectedRequest) return undefined;
-    closeButtonRef.current?.focus();
-    const closeOnEscape = (event) => {
-      if (event.key === 'Escape') setSelectedId(null);
-      if (event.key !== 'Tab') return;
-      const focusable = drawerRef.current?.querySelectorAll(
-        'button:not(:disabled), textarea:not(:disabled), input:not(:disabled), select:not(:disabled)'
-      );
-      if (!focusable?.length) {
-        event.preventDefault();
-        return;
-      }
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.removeEventListener('keydown', closeOnEscape);
-      detailTriggerRef.current?.focus();
-    };
-  }, [selectedId, hasSelectedRequest]);
+  useAccessibleDialog(Boolean(selectedId && hasSelectedRequest), {
+    containerRef: drawerRef,
+    initialFocusRef: closeButtonRef,
+    triggerRef: detailTriggerRef,
+    onClose: () => setSelectedId(null),
+  });
 
   const today = getLocalDate();
   const derivedCounts = useMemo(() => ({
@@ -258,7 +228,7 @@ const ApproverApprovals = ({
               <article className={styles.requestRow} key={request.id}>
                 <div className={styles.requestMain}>
                   <div className={styles.requestTitleLine}>
-                    <h3>{request.eventName}</h3><RequestStatus status={request.status} />
+                    <h3>{request.eventName}</h3><StatusBadge status={request.status} size="sm" />
                   </div>
                   <p className={styles.applicantLine}>{request.applicant?.name || 'Applicant not provided'} <span>·</span> {request.applicant?.department || 'Department not provided'}</p>
                   <div className={styles.requestMeta}>
@@ -289,7 +259,7 @@ const ApproverApprovals = ({
               <button ref={closeButtonRef} type="button" className={styles.closeButton} onClick={() => setSelectedId(null)} aria-label="Close details"><X size={20} /></button>
             </div>
             <div className={styles.drawerBody}>
-              <div className={styles.detailTitle}><div><h3>{selectedRequest.eventName}</h3><span>{selectedRequest.eventType || 'Event type not provided'}</span></div><RequestStatus status={selectedRequest.status} /></div>
+              <div className={styles.detailTitle}><div><h3>{selectedRequest.eventName}</h3><span>{selectedRequest.eventType || 'Event type not provided'}</span></div><StatusBadge status={selectedRequest.status} size="sm" /></div>
               <section className={styles.detailSection}>
                 <h3>Applicant information</h3>
                 <dl className={styles.detailGrid}>

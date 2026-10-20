@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronLeft,
@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import ApplicantLayout from '../layouts/ApplicantLayout';
 import { StatusBadge, GradientButton } from '../components';
-import { getApplicantBookings } from '../services/bookingService';
+import { useBookings } from '../hooks/useBookingData';
 import styles from './ApplicantSchedule.module.css';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -24,7 +24,7 @@ const toDateKey = (date) =>
 
 export default function ApplicantSchedule() {
   const navigate = useNavigate();
-  const [bookings, setBookings] = useState([]);
+  const bookings = useBookings('applicant');
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), 1);
@@ -35,17 +35,6 @@ export default function ApplicantSchedule() {
   const [selectedVenueFilter, setSelectedVenueFilter] = useState('All');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState('Approved');
   const [activeModalBooking, setActiveModalBooking] = useState(null);
-
-  useEffect(() => {
-    const load = () => {
-      setBookings(getApplicantBookings());
-    };
-    load();
-
-    const handler = () => load();
-    window.addEventListener('coep_bookings_changed', handler);
-    return () => window.removeEventListener('coep_bookings_changed', handler);
-  }, []);
 
   // Venue list from applicant bookings
   const venues = useMemo(() => {
@@ -96,14 +85,15 @@ export default function ApplicantSchedule() {
     const onDate = bookingsByDate[selectedDate] || [];
     return onDate
       .filter((b) => selectedVenueFilter === 'All' || b.venue === selectedVenueFilter)
-      .filter((b) => selectedStatusFilter === 'All' || b.status === selectedStatusFilter);
+      .filter((b) => selectedStatusFilter === 'All' || b.status === selectedStatusFilter)
+      .sort((a, b) => String(a.startTime || '').localeCompare(String(b.startTime || '')));
   }, [bookingsByDate, selectedDate, selectedVenueFilter, selectedStatusFilter]);
 
   // All upcoming approved bookings for overview
   const allUpcoming = useMemo(() => {
     return bookings
       .filter((b) => b.status === 'Approved' && b.date >= todayStr)
-      .sort((a, b) => new Date(a.date) - new Date(b.date));
+      .sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.startTime || '').localeCompare(String(b.startTime || '')));
   }, [bookings, todayStr]);
 
   return (

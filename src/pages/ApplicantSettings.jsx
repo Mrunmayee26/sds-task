@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import {
   UserCircle,
   Bell,
@@ -9,27 +9,38 @@ import {
 import ApplicantLayout from '../layouts/ApplicantLayout';
 import {
   CURRENT_APPLICANT,
-  getNotifications,
   markNotificationAsRead,
   markAllNotificationsAsRead,
 } from '../services/bookingService';
+import { useNotifications } from '../hooks/useBookingData';
 import styles from './ApplicantSettings.module.css';
 
+const PREFERENCES_KEY = 'coep_venueflow_demo_preferences_v1';
+const readPreferences = () => {
+  const defaults = { emailDigests: true, eventReminders: true };
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(PREFERENCES_KEY) || 'null');
+    return {
+      emailDigests: typeof saved?.emailDigests === 'boolean' ? saved.emailDigests : defaults.emailDigests,
+      eventReminders: typeof saved?.eventReminders === 'boolean' ? saved.eventReminders : defaults.eventReminders,
+    };
+  } catch {
+    return defaults;
+  }
+};
+
 export default function ApplicantSettings() {
-  const [notifications, setNotifications] = useState([]);
-  const [emailDigests, setEmailDigests] = useState(true);
-  const [eventReminders, setEventReminders] = useState(true);
+  const notifications = useNotifications();
+  const [preferences, setPreferences] = useState(readPreferences);
+  const { emailDigests, eventReminders } = preferences;
 
   useEffect(() => {
-    const load = () => {
-      setNotifications(getNotifications());
-    };
-    load();
-
-    const handler = () => load();
-    window.addEventListener('coep_notifications_changed', handler);
-    return () => window.removeEventListener('coep_notifications_changed', handler);
-  }, []);
+    try {
+      window.localStorage.setItem(PREFERENCES_KEY, JSON.stringify(preferences));
+    } catch {
+      // Preferences stay usable for this visit when browser storage is unavailable.
+    }
+  }, [preferences]);
 
   const handleMarkAsRead = (id) => {
     markNotificationAsRead(id);
@@ -97,27 +108,24 @@ export default function ApplicantSettings() {
             </div>
 
             {/* Preferences */}
-            <div style={{ borderTop: '1px solid var(--color-border-subtle)', paddingTop: 16 }}>
-              <span className={styles.fieldLabel} style={{ marginBottom: 10, display: 'block' }}>
-                Notification Preferences
-              </span>
+            <div className={styles.preferencesSection}>
+              <h3 className={styles.preferencesTitle}>Notification Preferences</h3>
+              <p className={styles.demoNote}>These preferences are saved in this browser for the demo and are not synced to a server.</p>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13.5px', marginBottom: 10, cursor: 'pointer' }}>
+              <label className={styles.preferenceOption}>
                 <input
                   type="checkbox"
                   checked={emailDigests}
-                  onChange={(e) => setEmailDigests(e.target.checked)}
-                  style={{ accentColor: 'var(--color-accent-purple)', width: 16, height: 16 }}
+                  onChange={(e) => setPreferences((current) => ({ ...current, emailDigests: e.target.checked }))}
                 />
                 Receive booking decision email alerts
               </label>
 
-              <label style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: '13.5px', cursor: 'pointer' }}>
+              <label className={styles.preferenceOption}>
                 <input
                   type="checkbox"
                   checked={eventReminders}
-                  onChange={(e) => setEventReminders(e.target.checked)}
-                  style={{ accentColor: 'var(--color-accent-purple)', width: 16, height: 16 }}
+                  onChange={(e) => setPreferences((current) => ({ ...current, eventReminders: e.target.checked }))}
                 />
                 24-Hour prior venue key collection reminder
               </label>
@@ -127,7 +135,7 @@ export default function ApplicantSettings() {
           {/* In-App Notifications Center */}
           <section className={styles.card} aria-label="Notifications center">
             <div className={styles.notifHeader}>
-              <div className={styles.cardTitleGroup} style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              <div className={styles.cardTitleGroup}>
                 <Bell size={20} color="var(--color-accent-purple)" />
                 <h2 className={styles.cardTitle}>In-App Notifications</h2>
               </div>
@@ -141,7 +149,7 @@ export default function ApplicantSettings() {
 
             <div className={styles.notifList}>
               {notifications.length === 0 ? (
-                <p style={{ textAlign: 'center', color: 'var(--color-text-secondary)', padding: '30px 0' }}>
+                <p className={styles.emptyNotifications}>
                   No notifications yet.
                 </p>
               ) : (
@@ -163,11 +171,12 @@ export default function ApplicantSettings() {
                       : styles.icon_info;
 
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={n.id}
                       className={`${styles.notifItem} ${!n.read ? styles.notifUnread : ''}`}
                       onClick={() => handleMarkAsRead(n.id)}
-                      style={{ cursor: 'pointer' }}
+                      aria-label={`${n.read ? 'Read' : 'Mark as read'}: ${n.title}`}
                     >
                       <div className={`${styles.notifIconWrap} ${iconClass}`}>{icon}</div>
 
@@ -185,7 +194,7 @@ export default function ApplicantSettings() {
                       </div>
 
                       {!n.read && <span className={styles.unreadDot} title="Unread" />}
-                    </div>
+                    </button>
                   );
                 })
               )}

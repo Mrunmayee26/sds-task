@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import PropTypes from 'prop-types';
 import {
   CalendarDays,
@@ -10,8 +10,9 @@ import {
 } from 'lucide-react';
 import { StatusBadge } from '../components';
 import ApproverLayout from '../layouts/ApproverLayout';
-import { SAMPLE_SCHEDULE_BOOKINGS } from './sampleData/approverSchedule.sample';
+import { SAMPLE_SCHEDULE_BOOKINGS } from '../data/demo/approverSchedule.js';
 import styles from './ApproverSchedule.module.css';
+import { useAccessibleDialog } from '../hooks/useAccessibleDialog';
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STATUSES = ['Approved', 'Pending', 'Rejected', 'Completed'];
@@ -80,30 +81,12 @@ const ApproverSchedule = ({
     return toDateKey(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), day));
   });
 
-  useEffect(() => {
-    if (!selectedBooking) return undefined;
-    closeButtonRef.current?.focus();
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') setSelectedBookingId(null);
-      if (event.key !== 'Tab') return;
-      const focusable = dialogRef.current?.querySelectorAll('button:not(:disabled)');
-      if (!focusable?.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-      triggerRef.current?.focus();
-    };
-  }, [selectedBooking]);
+  useAccessibleDialog(Boolean(selectedBooking), {
+    containerRef: dialogRef,
+    initialFocusRef: closeButtonRef,
+    triggerRef,
+    onClose: () => setSelectedBookingId(null),
+  });
 
   const changeMonth = (offset) => {
     const nextMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + offset, 1);
@@ -202,7 +185,7 @@ const ApproverSchedule = ({
                       <span className={styles.bookingTime}><Clock3 size={14} />{booking.startTime || 'Time TBD'}<span>– {booking.endTime || 'TBD'}</span></span>
                       <span className={styles.bookingName}>{booking.eventName || 'Untitled event'}</span>
                       <span className={styles.bookingVenue}><MapPin size={13} />{booking.venue || 'Venue not provided'}</span>
-                      <span className={styles.bookingBottom}><span>{booking.applicant || 'Applicant not provided'}</span><StatusBadge status={booking.status || 'Unknown'} size="sm" className={styles[`badge${booking.status}`] || ''} /></span>
+                      <span className={styles.bookingBottom}><span>{booking.applicant || 'Applicant not provided'}</span><StatusBadge status={booking.status || 'Unknown'} size="sm" /></span>
                     </button>
                   </li>
                 ))}
@@ -222,7 +205,7 @@ const ApproverSchedule = ({
               <div><dt>Venue</dt><dd>{selectedBooking.venue || 'Venue not provided'}</dd></div>
               <div><dt>Date</dt><dd>{formatDate(selectedBooking.date)}</dd></div>
               <div><dt>Time</dt><dd>{selectedBooking.startTime || 'TBD'} – {selectedBooking.endTime || 'TBD'}</dd></div>
-              <div><dt>Status</dt><dd><StatusBadge status={selectedBooking.status || 'Unknown'} size="sm" className={styles[`badge${selectedBooking.status}`] || ''} /></dd></div>
+              <div><dt>Status</dt><dd><StatusBadge status={selectedBooking.status || 'Unknown'} size="sm" /></dd></div>
             </dl>
             {selectedBooking.status === 'Pending' && <button type="button" className={styles.reviewLink} onClick={onReviewRequests}>Go to Approvals</button>}
           </aside>

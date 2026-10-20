@@ -18,13 +18,13 @@ import {
   SAMPLE_STATS,
   SAMPLE_SCHEDULE,
   SAMPLE_ACTIVITY,
-} from './sampleData/approverDashboard.sample';
+} from '../data/demo/approverDashboard.js';
 import styles from './ApproverDashboard.module.css';
 
 // ─── Frontend-only icon and colour mapping ────────────────────────────────────
 //
 // Icons and colour keys are a UI concern. They are NOT part of the API contract.
-// When the backend sends { id: 'pending', value: 3 }, this map enriches it here.
+// Parent data provides the stat id and value; this map adds presentation details.
 
 const STAT_UI_MAP = {
   pending:  { icon: <ClipboardCheck size={22} />, colorKey: 'amber'  },
@@ -89,13 +89,12 @@ ErrorState.propTypes = { message: PropTypes.string.isRequired };
  * testable without a network. Sample data is passed as defaults so the UI
  * previews immediately.
  *
- * ── How to wire to the real backend ─────────────────────────────────────────
+ * ── Data boundary ───────────────────────────────────────────────────────────
  *
- *  1. Create a data-fetching wrapper (e.g. ApproverDashboardPage) that calls
- *     the API endpoints listed in approverDashboard.sample.js.
- *  2. Pass the responses as props: approver, stats, schedule, activity.
- *  3. Pass the corresponding loading/error booleans.
- *  4. Remove the default prop values once the real data layer is in place.
+ *  1. Keep data access in a parent wrapper or focused service module.
+ *  2. Pass display data as props: approver, stats, schedule, activity.
+ *  3. Pass the corresponding loading/error state when a remote source is connected.
+ *  4. Agree on endpoint paths and response shapes before adding API calls.
  *
  * ── Navigation integration points ───────────────────────────────────────────
  *
@@ -105,13 +104,13 @@ ErrorState.propTypes = { message: PropTypes.string.isRequired };
  *
  * @param {object}  props
  * @param {object}  props.approver            - Authenticated approver user object.
- * @param {Array}   props.stats               - Dashboard stat values from the API.
+ * @param {Array}   props.stats               - Dashboard stat values supplied by the parent.
  * @param {boolean} props.statsLoading        - True while stats are being fetched.
  * @param {string|null} props.statsError      - Error message if stats fetch failed.
- * @param {Array}   props.schedule            - Today's bookings from the API.
+ * @param {Array}   props.schedule            - Today's bookings supplied by the parent.
  * @param {boolean} props.scheduleLoading     - True while schedule is being fetched.
  * @param {string|null} props.scheduleError   - Error message if schedule fetch failed.
- * @param {Array}   props.activity            - Recent booking activity from the API.
+ * @param {Array}   props.activity            - Recent booking activity supplied by the parent.
  * @param {boolean} props.activityLoading     - True while activity is being fetched.
  * @param {string|null} props.activityError   - Error message if activity fetch failed.
  * @param {Function} props.onReviewRequests   - Called when the "Review requests" button is clicked.
