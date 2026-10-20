@@ -1,0 +1,471 @@
+/* ─────────────────────────────────────────────────────────────────────────
+   ApplicantDashboard.module.css
+   Dashboard styles for the Applicant Portal.
+   ───────────────────────────────────────────────────────────────────────── */
+
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+/* ── Hero Welcome Banner ───────────────────────────────────────────────── */
+.heroBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 28px 32px;
+  background: linear-gradient(135deg, #FFFFFF 0%, #FAF8FF 100%);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-subtle);
+  position: relative;
+  overflow: hidden;
+}
+
+.heroBanner::after {
+  content: '';
+  position: absolute;
+  top: -50px;
+  right: -50px;
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 111, 0, 0.08) 0%, rgba(112, 71, 235, 0.04) 70%, transparent 100%);
+  pointer-events: none;
+}
+
+.heroContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.greetingTitle {
+  font-size: 26px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  margin-bottom: 6px;
+  letter-spacing: -0.4px;
+}
+
+.greetingSubtitle {
+  font-size: 14.5px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.outlineActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  font-size: 13.5px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-input);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.outlineActionBtn:hover {
+  border-color: var(--color-accent-purple);
+  color: var(--color-accent-purple);
+  background: var(--color-accent-purple-light);
+}
+
+/* ── Needs Attention Alert Box ─────────────────────────────────────────── */
+.attentionSection {
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  border-radius: var(--radius-lg);
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.attentionLeft {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.attentionIconWrap {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  background: #FEF3C7;
+  color: #D97706;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.attentionTitle {
+  font-size: 14px;
+  font-weight: var(--font-weight-bold);
+  color: #92400E;
+  margin-bottom: 3px;
+}
+
+.attentionDesc {
+  font-size: 13px;
+  color: #B45309;
+  line-height: 1.4;
+}
+
+.attentionActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: #FFFFFF;
+  background: #D97706;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+}
+
+.attentionActionBtn:hover {
+  background: #B45309;
+}
+
+/* ── Summary Statistics Grid ───────────────────────────────────────────── */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.statCard {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow-subtle);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.statCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card);
+}
+
+.statIconWrap {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.stat_blue .statIconWrap {
+  background: rgba(59, 130, 246, 0.1);
+  color: #2563EB;
+}
+
+.stat_amber .statIconWrap {
+  background: rgba(245, 158, 11, 0.12);
+  color: #D97706;
+}
+
+.stat_green .statIconWrap {
+  background: rgba(16, 185, 129, 0.12);
+  color: #059669;
+}
+
+.stat_rose .statIconWrap {
+  background: rgba(239, 68, 68, 0.1);
+  color: #DC2626;
+}
+
+.statBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1.1;
+}
+
+.statLabel {
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+/* ── Lower Two-Column Grid ─────────────────────────────────────────────── */
+.lowerGrid {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 20px;
+}
+
+.panelCard {
+  background: var(--color-card-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-xl);
+  padding: 24px;
+  box-shadow: var(--shadow-subtle);
+  display: flex;
+  flex-direction: column;
+}
+
+.panelHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.panelTitleGroup {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.panelTitleIcon {
+  color: var(--color-accent-purple);
+}
+
+.panelTitle {
+  font-size: 17px;
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+}
+
+.seeAllLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-accent-purple);
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.seeAllLink:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* ── Upcoming Bookings List ────────────────────────────────────────────── */
+.bookingItemsList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.bookingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-subtle);
+  background: #FCFCFE;
+  transition: all 0.2s ease;
+}
+
+.bookingRow:hover {
+  background: #FFFFFF;
+  border-color: var(--color-border-input);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+}
+
+.bookingLeft {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.dateBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-purple-light);
+  color: var(--color-accent-purple);
+  flex-shrink: 0;
+}
+
+.dateMonth {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.dateDay {
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bookingInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.bookingTitle {
+  font-size: 14.5px;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bookingMeta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+
+.metaItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bookingRight {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+/* ── Activity Feed ─────────────────────────────────────────────────────── */
+.activityTimeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+}
+
+.activityItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  position: relative;
+}
+
+.activityDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.dot_approved {
+  background: #10B981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.dot_pending {
+  background: #F59E0B;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
+}
+
+.dot_rejected {
+  background: #EF4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2);
+}
+
+.activityBody {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activityTitle {
+  font-size: 13.5px;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-text-primary);
+}
+
+.activityMeta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ── Empty State ───────────────────────────────────────────────────────── */
+.emptyState {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+/* ── Responsive ────────────────────────────────────────────────────────── */
+@media (max-width: 1024px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .lowerGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .heroBanner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .heroActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .statsGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .attentionSection {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

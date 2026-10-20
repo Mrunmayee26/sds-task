@@ -21,6 +21,14 @@ const StatusBadge = ({
     statusClass = styles.free;
   } else if (normalizedStatus === 'pending') {
     statusClass = styles.pending;
+  } else if (normalizedStatus === 'approved') {
+    statusClass = styles.approved;
+  } else if (normalizedStatus === 'rejected') {
+    statusClass = styles.rejected;
+  } else if (normalizedStatus === 'cancelled') {
+    statusClass = styles.cancelled;
+  } else if (normalizedStatus === 'completed') {
+    statusClass = styles.completed;
   }
 
   const badgeClasses = [

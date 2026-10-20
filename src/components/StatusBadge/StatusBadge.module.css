@@ -46,8 +46,32 @@
 
 .pending {
   background: #FFF4E5;
-  color: #E66A00;
-  border: 1px solid rgba(230, 106, 0, 0.2);
+  color: #B45309;
+  border: 1px solid rgba(217, 119, 6, 0.25);
+}
+
+.approved {
+  background: #ECFDF5;
+  color: #065F46;
+  border: 1px solid rgba(16, 185, 129, 0.28);
+}
+
+.rejected {
+  background: #FEF2F2;
+  color: #991B1B;
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.cancelled {
+  background: #F1F5F9;
+  color: #475569;
+  border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.completed {
+  background: #EFF6FF;
+  color: #1E40AF;
+  border: 1px solid rgba(59, 130, 246, 0.25);
 }
 
 .default {

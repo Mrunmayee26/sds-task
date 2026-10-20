@@ -9,6 +9,7 @@ import {
   UserCircle,
   LogOut,
   ShieldCheck,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { Sidebar } from '../components';
 import styles from './ApproverLayout.module.css';
@@ -86,10 +87,22 @@ const ApproverLayout = ({ children }) => {
 
       <div className={styles.mainWrapper}>
         <div className={styles.portalBanner}>
-          <span className={styles.portalBannerDot} aria-hidden="true" />
-          <span className={styles.portalBannerText}>
-            Viewing as Approver portal
-          </span>
+          <div className={styles.portalBannerLeft}>
+            <span className={styles.portalBannerDot} aria-hidden="true" />
+            <span className={styles.portalBannerText}>
+              Viewing as Approver portal
+            </span>
+          </div>
+
+          <button
+            type="button"
+            className={styles.switchPortalBtn}
+            onClick={() => navigate('/applicant/dashboard')}
+            title="Switch to Applicant Portal (Student / Club)"
+          >
+            <ArrowRightLeft size={14} />
+            Switch to Applicant
+          </button>
         </div>
 
         <main className={styles.mainContent} id="approver-main" tabIndex={-1}>
