@@ -20,6 +20,7 @@ import './App.css';
 import ApproverDashboard from './pages/ApproverDashboard.jsx';
 import ApproverApprovals from './pages/ApproverApprovals.jsx';
 import ApproverSchedule from './pages/ApproverSchedule.jsx';
+import ApproverVenues from './pages/ApproverVenues.jsx';
 
 function ApplicantApp() {
   const [activeNav, setActiveNav] = useState('book-venue');
@@ -357,12 +358,12 @@ export default function App() {
           element={<ApproverScheduleRoute />}
         />
 
-        {/* Redirect unfinished pages to the dashboard for now */}
         <Route
           path="/approver/venues"
-          element={<Navigate to="/approver/dashboard" replace />}
+          element={<ApproverVenues />}
         />
 
+        {/* Redirect unfinished pages to the dashboard for now */}
         <Route
           path="/approver/settings"
           element={<Navigate to="/approver/dashboard" replace />}
