@@ -1,7 +1,6 @@
 /**
  * Sample booking requests for the standalone Approver Approvals UI preview.
- * Replace these records with API data in the parent page when the backend is
- * available; this module does not imply an API endpoint exists.
+ * Strictly uses the official 56 COEP venues (Main Auditorium, Mini Auditorium, NC01-NC32, SC01-SC20).
  */
 export const SAMPLE_APPROVAL_REQUESTS = [
   {
@@ -23,7 +22,7 @@ export const SAMPLE_APPROVAL_REQUESTS = [
     eventName: 'Design Thinking Workshop',
     eventType: 'Workshop',
     applicant: { name: 'Rohan Deshpande', department: 'Innovation Cell', verified: true },
-    venue: 'Seminar Hall B',
+    venue: 'Mini Auditorium',
     date: '2026-11-06',
     startTime: '13:30',
     endTime: '17:00',
@@ -37,11 +36,11 @@ export const SAMPLE_APPROVAL_REQUESTS = [
     eventName: 'Literary Society Open Mic',
     eventType: 'Student event',
     applicant: { name: 'Ananya Joshi', department: 'Literary & Debate Society', verified: true },
-    venue: 'Open Air Theatre',
+    venue: 'NC01',
     date: '2026-11-08',
     startTime: '17:00',
     endTime: '20:00',
-    attendance: 150,
+    attendance: 60,
     purpose: 'An evening of poetry, short readings, and student performances.',
     status: 'Approved',
     decisionDate: '2026-10-19',
@@ -52,7 +51,7 @@ export const SAMPLE_APPROVAL_REQUESTS = [
     eventName: 'Department Research Colloquium',
     eventType: 'Academic event',
     applicant: { name: 'Kabir Patil', department: 'Mechanical Engineering', verified: false },
-    venue: 'Conference Room 2',
+    venue: 'SC01',
     date: '2026-11-10',
     startTime: '09:30',
     endTime: '12:30',

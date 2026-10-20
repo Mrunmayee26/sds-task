@@ -26,11 +26,39 @@
 .portalBanner {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
   padding: 10px 32px;
   background-color: var(--color-accent-purple-light);
   border-bottom: 1px solid var(--color-border-subtle);
   flex-shrink: 0;
+}
+
+.portalBannerLeft {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.switchPortalBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: var(--font-weight-semibold);
+  color: #C2410C;
+  background: #FFF8F0;
+  border: 1px solid rgba(255, 111, 0, 0.25);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.switchPortalBtn:hover {
+  background: var(--gradient-primary);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-button);
 }
 
 .portalBannerDot {
