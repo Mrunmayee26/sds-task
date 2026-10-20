@@ -1,0 +1,85 @@
+.brandPanel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  min-height: 100vh;
+  padding: clamp(36px, 5vw, 72px);
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 12% 88%, rgba(255, 106, 0, .12), transparent 34%),
+    radial-gradient(ellipse at 91% 18%, rgba(255, 45, 104, .11), transparent 29%),
+    linear-gradient(145deg, #f7f4ff 0%, #f3efff 52%, #fbf7ff 100%);
+}
+
+.brandGlow {
+  position: absolute;
+  right: -118px;
+  bottom: 12%;
+  width: 310px;
+  height: 310px;
+  border: 1px solid rgba(112, 71, 235, .10);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.brandGlow::before,
+.brandGlow::after {
+  position: absolute;
+  content: '';
+  border: 1px solid rgba(255, 79, 102, .10);
+  border-radius: 50%;
+}
+
+.brandGlow::before { inset: 28px; }
+.brandGlow::after { inset: 58px; }
+
+.brandContent,
+.brandFooter { position: relative; z-index: 1; }
+
+.brandIdentity { display: flex; align-items: center; gap: 12px; }
+.brandIcon {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 15px;
+  color: #fff;
+  background: var(--gradient-primary);
+  box-shadow: var(--shadow-button);
+}
+.brandName { color: var(--color-text-primary); font-size: 22px; font-weight: 800; letter-spacing: -.04em; }
+.brandSubtitle { margin: 8px 0 0 60px; color: var(--color-accent-purple); font-size: 9px; font-weight: 800; letter-spacing: .24em; }
+.brandTag {
+  display: inline-flex;
+  margin-top: clamp(58px, 10vh, 108px);
+  padding: 8px 12px;
+  border: 1px solid rgba(112, 71, 235, .3);
+  border-radius: var(--radius-pill);
+  color: #6041c7;
+  background: rgba(255, 255, 255, .56);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .1em;
+}
+
+.brandMessage { max-width: 480px; margin-top: 24px; }
+.brandOverline { margin-bottom: 14px; color: #ec5a49; font-size: 12px; font-weight: 700; }
+.brandMessage h1 { max-width: 450px; color: #25213a; font-size: clamp(36px, 4.2vw, 54px); font-weight: 700; letter-spacing: -.055em; line-height: 1.12; }
+.brandDescription { max-width: 420px; margin-top: 20px; color: #666278; font-size: 14px; line-height: 1.85; }
+.brandFooter { color: #77738a; font-size: 11px; font-weight: 600; letter-spacing: .02em; }
+
+@media (max-width: 900px) {
+  .brandPanel { padding: 40px 32px; }
+  .brandMessage h1 { font-size: clamp(32px, 4.5vw, 44px); }
+}
+
+@media (max-width: 680px) {
+  .brandPanel { min-height: auto; padding: 30px 26px 26px; }
+  .brandTag { margin-top: 30px; }
+  .brandMessage { margin-top: 16px; }
+  .brandMessage h1 { max-width: 540px; font-size: clamp(31px, 8vw, 42px); }
+  .brandDescription { margin-top: 12px; font-size: 12px; line-height: 1.65; }
+  .brandFooter { margin-top: 27px; }
+  .brandGlow { right: -175px; bottom: -205px; }
+}

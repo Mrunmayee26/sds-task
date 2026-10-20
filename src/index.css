@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+:root {
+  /* Gradients */
+  --gradient-primary: linear-gradient(90deg, #FF6F00 0%, #FF3366 100%);
+  --gradient-primary-hover: linear-gradient(90deg, #FF7D14 0%, #FF4D79 100%);
+  --gradient-booked: linear-gradient(90deg, #FF7700 0%, #FF3868 100%);
+  --gradient-header: linear-gradient(90deg, #FF6A00 0%, #EE0979 100%);
+
+  /* Accent Colors */
+  --color-accent-purple: #7047EB;
+  --color-accent-purple-hover: #5F34DC;
+  --color-accent-purple-light: #F4F0FF;
+  --color-accent-purple-active: #5429CE;
+
+  /* Neutrals & Backgrounds */
+  --color-bg-app: #F6F7FB;
+  --color-sidebar-bg: #F3F2F8;
+  --color-card-bg: #FFFFFF;
+  --color-panel-bg: #FFFFFF;
+
+  /* Typography Colors */
+  --color-text-primary: #1C1A29;
+  --color-text-secondary: #6B687E;
+  --color-text-muted: #9593A6;
+  --color-text-white: #FFFFFF;
+
+  /* Borders & Dividers */
+  --color-border-subtle: #ECEBF2;
+  --color-border-input: #DFDCE8;
+  --color-border-focus: #7047EB;
+
+  /* Status Colors */
+  --color-status-free: #7047EB;
+  --color-status-booked: #FF4D5B;
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-2xl: 24px;
+  --radius-pill: 9999px;
+
+  /* Shadows */
+  --shadow-subtle: 0 4px 20px rgba(32, 28, 55, 0.04);
+  --shadow-card: 0 10px 30px -5px rgba(28, 24, 52, 0.05), 0 2px 8px -2px rgba(28, 24, 52, 0.03);
+  --shadow-card-hover: 0 16px 36px -4px rgba(28, 24, 52, 0.08), 0 4px 12px -2px rgba(28, 24, 52, 0.04);
+  --shadow-button: 0 6px 18px -2px rgba(255, 51, 102, 0.38);
+  --shadow-purple: 0 6px 18px -2px rgba(112, 71, 235, 0.32);
+
+  /* Typography */
+  --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+}
+
+/* Base Styles & Resets */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  width: 100%;
+  min-height: 100%;
+  font-family: var(--font-family);
+  background-color: var(--color-bg-app);
+  color: var(--color-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+}
+
+button {
+  font-family: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--color-border-focus);
+  outline-offset: 2px;
+}
+
+input, select, textarea {
+  font-family: inherit;
+  font-size: 14px;
+}

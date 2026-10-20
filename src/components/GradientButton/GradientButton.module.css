@@ -1,0 +1,92 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: var(--font-family);
+  font-weight: var(--font-weight-semibold);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  border: none;
+  text-decoration: none;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  white-space: nowrap;
+  outline: none;
+  box-sizing: border-box;
+}
+
+/* Sizes */
+.sm {
+  padding: 8px 16px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.md {
+  padding: 12px 24px;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.lg {
+  padding: 15px 32px;
+  font-size: 16px;
+  line-height: 1.25;
+}
+
+/* Full Width Option */
+.fullWidth {
+  width: 100%;
+}
+
+/* Solid Variant (Orange to Red/Pink Gradient) */
+.solid {
+  background: var(--gradient-primary);
+  color: var(--color-text-white);
+  box-shadow: var(--shadow-button);
+}
+
+.solid:hover:not(:disabled) {
+  background: var(--gradient-primary-hover);
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 22px -2px rgba(255, 51, 102, 0.46);
+}
+
+.solid:active:not(:disabled) {
+  transform: translateY(0.5px) scale(0.99);
+  box-shadow: 0 4px 12px -2px rgba(255, 51, 102, 0.32);
+}
+
+/* Outlined Variant */
+.outline {
+  background: transparent;
+  color: #FF5038;
+  border: 1.5px solid #FF5038;
+  box-shadow: none;
+}
+
+.outline:hover:not(:disabled) {
+  background: rgba(255, 80, 56, 0.08);
+  border-color: #FF3366;
+  color: #FF3366;
+  transform: translateY(-1.5px);
+}
+
+.outline:active:not(:disabled) {
+  transform: translateY(0.5px);
+  background: rgba(255, 80, 56, 0.12);
+}
+
+/* Focus & Disabled States */
+.button:focus-visible {
+  outline: 2px solid var(--color-accent-purple);
+  outline-offset: 3px;
+}
+
+.button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
+}
