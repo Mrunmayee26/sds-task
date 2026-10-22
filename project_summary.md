@@ -36,6 +36,15 @@ Approver venue sample statuses and example bookings are in `src/pages/sampleData
 
 Applicant notification preferences are stored in local browser storage and are not sent to a backend. Booking attachments are not uploaded; the demo record holds a filename only.
 
+## Backend & Connected Database
+
+The Supabase PostgreSQL database is active and connected with all 11 ER tables:
+- Venues table: 84 verified official campus venues with capacities, types, and buildings
+- Master tables: `buildings` (18 rows), `organizational_units` (20 rows), `approval_groups` (17 rows), `venue_additional_approvals` (4 rows)
+- Transactional tables: `users`, `applications`, `booking_slots`, `application_approvals`, `approval_events` (ready with 0 rows)
+
+For the complete schema, column types, relationships, and queries, refer to `backend/DATABASE_CONTEXT.md`.
+
 ## Future backend
 
 `src/services/apiClient.js` is an optional Fetch wrapper configured by `VITE_API_BASE_URL`. It supplies response and network error handling but intentionally does not guess API endpoints or response contracts. The existing booking workflow remains local until FastAPI endpoints and their schemas are agreed. Keep database credentials and Supabase service keys out of client-side environment variables.
