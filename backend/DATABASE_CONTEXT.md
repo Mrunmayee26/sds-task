@@ -22,9 +22,9 @@
 |---|---|---|---|
 | 1 | `organizational_units` | 20 | Academic departments, administrative offices, centres |
 | 2 | `buildings` | 18 | Campus buildings, complexes, and locations |
-| 3 | `users` | 0 | Registered students, faculty, staff, and approvers |
+| 3 | `users` | 4+ | Registered students, faculty, staff, and approvers |
 | 4 | `approval_groups` | 17 | Authorities/bodies that review booking applications |
-| 5 | `group_members` | 0 | Users assigned to approval groups with review privileges |
+| 5 | `group_members` | 2+ | Users assigned to approval groups with review privileges |
 | 6 | `venues` | 84 | Full official campus venue inventory with capacities |
 | 7 | `venue_additional_approvals` | 4 | Extra multi-step approval rules for restricted venues |
 | 8 | `applications` | 0 | Booking applications submitted by applicants |

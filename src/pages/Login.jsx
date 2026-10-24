@@ -44,10 +44,6 @@ export default function Login() {
       setError('Enter a valid email address.');
       return;
     }
-    if (!mockAuthEnabled) {
-      setError('Backend authentication is not configured for this build.');
-      return;
-    }
 
     setIsSubmitting(true);
     try {
@@ -74,7 +70,7 @@ export default function Login() {
         { replace: true }
       );
     } catch (authError) {
-      setError(authError.message || 'Unable to start the development preview.');
+      setError(authError.message || 'Unable to sign in. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -89,9 +85,7 @@ export default function Login() {
           <p className={styles.welcomeLabel}>WELCOME BACK</p>
           <h2 id="login-title">Sign in to VenueFlow</h2>
           <p className={styles.formSubtitle}>
-            {mockAuthEnabled
-              ? 'Use your local development test account to continue.'
-              : 'Backend sign-in is not configured in this build.'}
+            Sign in with your official university credentials.
           </p>
 
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
@@ -172,19 +166,14 @@ export default function Login() {
 
             <div className={styles.formOptions}>
               <label className={styles.keepSignedIn}>
-                <input type="checkbox" checked={keepSignedIn} onChange={(event) => setKeepSignedIn(event.target.checked)} aria-describedby="session-note" />
+                <input type="checkbox" checked={keepSignedIn} onChange={(event) => setKeepSignedIn(event.target.checked)} />
                 <span>Keep me signed in</span>
               </label>
             </div>
-            <p className={styles.sessionNote} id="session-note">
-              {mockAuthEnabled
-                ? 'Development-only mock accounts; this is not real authentication. Sessions last for this tab.'
-                : 'The development role preview is disabled. Login will be available when backend authentication is connected.'}
-            </p>
 
             {error && <p className={styles.error} id="login-error" role="alert">{error}</p>}
 
-            <button className={styles.submit} type="submit" disabled={!mockAuthEnabled || isSubmitting}>
+            <button className={styles.submit} type="submit" disabled={isSubmitting}>
               {isSubmitting ? 'Signing in…' : 'Sign In'} <ArrowRight size={17} aria-hidden="true" />
             </button>
           </form>
@@ -194,11 +183,6 @@ export default function Login() {
             <Link to="/register" className={styles.textLink}>
               Create an account
             </Link>
-          </p>
-          <p className={styles.demoDisclaimer}>
-            {mockAuthEnabled
-              ? 'Local development preview only. This is not secure authentication.'
-              : 'Authentication is unavailable until the backend login service is connected.'}
           </p>
         </div>
       </section>

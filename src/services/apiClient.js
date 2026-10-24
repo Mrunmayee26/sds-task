@@ -9,7 +9,15 @@ export class ApiError extends Error {
   }
 }
 
-/** Small Fetch wrapper for future FastAPI integration; callers define endpoint paths. */
+export function getStoredAuthToken() {
+  try {
+    return sessionStorage.getItem('venueflow_auth_token_v1') || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Small Fetch wrapper for FastAPI integration; callers define endpoint paths. */
 export async function apiRequest(path, options = {}) {
   const baseUrl = getApiBaseUrl();
   if (!baseUrl) {
@@ -21,6 +29,11 @@ export async function apiRequest(path, options = {}) {
 
   const endpoint = `${baseUrl}/${path.replace(/^\/+/, '')}`;
   const headers = new Headers(options.headers || {});
+  const token = getStoredAuthToken();
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
   const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
   const isJsonValue = Array.isArray(options.body)
     || (options.body != null && Object.getPrototypeOf(options.body) === Object.prototype);

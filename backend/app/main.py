@@ -7,18 +7,22 @@ backend_root = Path(__file__).resolve().parent.parent
 if str(backend_root) not in sys.path:
     sys.path.insert(0, str(backend_root))
 
+# pyrefly: ignore[missing-import]
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.db.session import init_db_pool, close_db_pool, test_db_connection
+from app.repositories.user_repo import ensure_default_accounts
+from app.api.v1 import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize connection pool
+    # Startup: initialize connection pool and verify default accounts
     try:
         init_db_pool()
+        ensure_default_accounts()
     except Exception as e:
-        print(f"Warning: Could not connect to DB on startup: {e}")
+        print(f"Warning: Startup check encountered an issue: {e}")
     yield
     # Shutdown: close connection pool
     close_db_pool()
@@ -38,6 +42,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Mount API routers
+app.include_router(api_router, prefix="/api/v1")
 
 @app.get("/")
 def root():
