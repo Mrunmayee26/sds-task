@@ -11,7 +11,7 @@ class UserRegisterRequest(BaseModel):
     lastName: Optional[str] = None
     full_name: Optional[str] = None
     email: str = Field(pattern=EMAIL_PATTERN, description="Valid email address")
-    password: str = Field(min_length=6, description="User password with minimum 6 characters")
+    password: str = Field(min_length=6, max_length=72, description="Password, maximum 72 UTF-8 bytes")
     role: str = Field(default="applicant", description="Role: 'applicant' or 'approver'")
     identifier: Optional[str] = None
     home_unit_id: Optional[int] = None

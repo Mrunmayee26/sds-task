@@ -1,12 +1,9 @@
 from pathlib import Path
 from typing import List
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Load environment variables from .env
-load_dotenv(BASE_DIR / ".env", override=True)
 
 class Settings(BaseSettings):
     """Application runtime settings and environment configurations."""
@@ -15,9 +12,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/postgres"
     DB_MIN_CONNECTIONS: int = 1
     DB_MAX_CONNECTIONS: int = 10
+    SEED_DEMO_ACCOUNTS: bool = False
 
     # JWT Authentication
-    JWT_SECRET_KEY: str = "venueflow_dev_secret_key_coep_2026_super_secure_984321"
+    JWT_SECRET_KEY: str = Field(min_length=32)
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
 

@@ -1,5 +1,12 @@
 # COEP VenueFlow — Database & Backend Context
 
+> Implementation update: venue, availability, booking, cancellation and multi-stage
+> approval APIs now exist under `/api/v1`. See `README.md` in this directory for
+> the current contract. Existing Supabase databases need
+> `sql/migrations/001_booking_fields.sql` (attendance, cancellation reason and
+> indexes). This checkout had no Supabase credentials, so the live migration has
+> not been applied here. Historical record counts below have not been reverified.
+
 > **Quick Reference Document**: This document caches the complete schema, relationships, row counts, and architectural status of the Supabase PostgreSQL database and FastAPI backend. Agents and developers should read this file directly to avoid re-querying or re-analyzing the live database.
 
 ---
@@ -131,6 +138,8 @@ Booking requests created by applicants.
 | `application_type` | `varchar(40)` | NO | - | Academic, Cultural, Workshop, etc. |
 | `purpose` | `varchar(255)` | NO | - | Event title / purpose |
 | `description` | `text` | YES | - | Detailed description |
+| `expected_attendance` | `integer` | YES | - | Positive attendance; added by migration 001 |
+| `cancellation_reason` | `text` | YES | - | Owner's reason; added by migration 001 |
 | `status` | `varchar(30)` | NO | `'draft'` | `'draft'`, `'submitted'`, `'approved'`, `'rejected'`, `'cancelled'` |
 | `created_at` | `timestamptz` | NO | `now()` | Created timestamp |
 | `submitted_at` | `timestamptz` | YES | - | Submission timestamp |
@@ -209,14 +218,15 @@ Immutable audit trail of actions taken on an approval step.
                     │ psycopg2 (ThreadedConnectionPool in session.py)
                     ▼
 [ FastAPI Backend (backend/app/main.py) ]
-  - Currently implements: GET /, GET /health
-  - Missing endpoints: GET /api/venues, POST /api/applications, Auth routes
+  - GET /, GET /health, /api/v1/auth/*
+  - /api/v1/venues, venue details and availability
+  - /api/v1/bookings, retrieval, cancellation and status decisions
                     ▲
                     │ HTTP Fetch (via VITE_API_BASE_URL="http://localhost:8000")
                     ▼
 [ React + Vite Frontend (src/) ]
   - Currently reads: src/data/venues.js (56 hardcoded items, null capacities)
-  - Needs update: fetch live venues from GET /api/venues with fallback to local
+  - Needs update: fetch live venues from GET /api/v1/venues and connect booking APIs
 ```
 
 ---

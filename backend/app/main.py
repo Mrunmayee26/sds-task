@@ -10,6 +10,9 @@ if str(backend_root) not in sys.path:
 # pyrefly: ignore[missing-import]
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from psycopg2 import OperationalError, InterfaceError
+from psycopg2.pool import PoolError
 from app.config import settings
 from app.db.session import init_db_pool, close_db_pool, test_db_connection
 from app.repositories.user_repo import ensure_default_accounts
@@ -17,15 +20,14 @@ from app.api.v1 import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: initialize connection pool and verify default accounts
-    try:
-        init_db_pool()
+    # Fail clearly if the database is unavailable. Schema setup is explicit.
+    init_db_pool()
+    if settings.SEED_DEMO_ACCOUNTS:
         ensure_default_accounts()
-    except Exception as e:
-        print(f"Warning: Startup check encountered an issue: {e}")
-    yield
-    # Shutdown: close connection pool
-    close_db_pool()
+    try:
+        yield
+    finally:
+        close_db_pool()
 
 app = FastAPI(
     title="COEP VenueFlow API",
@@ -46,6 +48,13 @@ app.add_middleware(
 # Mount API routers
 app.include_router(api_router, prefix="/api/v1")
 
+
+@app.exception_handler(OperationalError)
+@app.exception_handler(InterfaceError)
+@app.exception_handler(PoolError)
+async def database_unavailable(request, exc):
+    return JSONResponse(status_code=503, content={"detail": "Database unavailable. Please try again later."})
+
 @app.get("/")
 def root():
     return {
@@ -63,8 +72,5 @@ def health_check():
             "status": "healthy",
             "database": db_health
         }
-    except Exception as e:
-        return {
-            "status": "degraded",
-            "database_error": str(e)
-        }
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "degraded", "database": "unavailable"})

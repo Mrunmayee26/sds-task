@@ -68,7 +68,7 @@ def verify_and_consume_otp(email: str, otp_code: str) -> Optional[Dict[str, Any]
           AND is_verified = FALSE
           AND expires_at > NOW()
         ORDER BY created_at DESC
-        LIMIT 1;
+        LIMIT 1 FOR UPDATE;
     """
     with get_db_cursor(commit=True) as cur:
         cur.execute(query, (email.strip(), otp_code.strip()))

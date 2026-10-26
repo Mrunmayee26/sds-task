@@ -47,4 +47,13 @@ For the complete schema, column types, relationships, and queries, refer to `bac
 
 ## Future backend
 
-`src/services/apiClient.js` is an optional Fetch wrapper configured by `VITE_API_BASE_URL`. It supplies response and network error handling but intentionally does not guess API endpoints or response contracts. The existing booking workflow remains local until FastAPI endpoints and their schemas are agreed. Keep database credentials and Supabase service keys out of client-side environment variables.
+Person 3/4 implementation is available under `backend/app`: `/api/v1/venues`,
+availability, authenticated `/api/v1/bookings`, cancellation and multi-stage group
+decisions. `backend/README.md` is the current setup and API contract. Existing
+Supabase installations need `backend/sql/migrations/001_booking_fields.sql`.
+The live database has not been migrated in this checkout because credentials were
+not present. Tests use a separate disposable PostgreSQL database.
+
+`src/services/apiClient.js` is a Fetch wrapper configured by `VITE_API_BASE_URL`.
+Authentication is connected; the booking workflow still uses its local demo service.
+Keep database credentials and Supabase service keys out of client-side environment variables.

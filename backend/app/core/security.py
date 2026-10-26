@@ -5,10 +5,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 import bcrypt
 import jwt
+from fastapi import HTTPException
 from app.config import settings
 
 def hash_password(password: str) -> str:
     """Hash a plaintext password using bcrypt."""
+    if len(password.encode("utf-8")) > 72:
+        raise HTTPException(422, "Password must be at most 72 UTF-8 bytes")
     salt = bcrypt.gensalt(rounds=12)
     hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
     return hashed.decode("utf-8")

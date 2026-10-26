@@ -19,7 +19,8 @@ def init_db_pool() -> ThreadedConnectionPool:
             _pool = ThreadedConnectionPool(
                 minconn=settings.DB_MIN_CONNECTIONS,
                 maxconn=settings.DB_MAX_CONNECTIONS,
-                dsn=settings.DATABASE_URL
+                dsn=settings.DATABASE_URL,
+                connect_timeout=10,
             )
             logger.info("PostgreSQL connection pool established successfully.")
         except Exception as e:
@@ -45,6 +46,8 @@ def get_db_connection() -> Generator[psycopg2.extensions.connection, None, None]
     try:
         yield conn
     finally:
+        # End read transactions too, before returning a connection to the pool.
+        conn.rollback()
         pool.putconn(conn)
 
 @contextmanager

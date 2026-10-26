@@ -18,7 +18,6 @@ from app.repositories.user_repo import (
     get_user_by_email,
     get_user_approval_groups,
     create_user,
-    assign_user_to_group,
 )
 from app.repositories.otp_repo import (
     save_otp,
@@ -42,6 +41,8 @@ def register_user(payload: UserRegisterRequest, background_tasks: BackgroundTask
     The user record is formally created in the database only after OTP confirmation.
     """
     normalized_email = payload.email.strip().lower()
+    if payload.role.strip().lower() != "applicant":
+        raise HTTPException(403, "Approver accounts must be assigned by an administrator.")
     
     # Check if user already exists
     existing = get_user_by_email(normalized_email)
@@ -105,16 +106,12 @@ def verify_registration_otp(payload: VerifyOtpRequest):
         full_name=staged_data["full_name"],
         email=normalized_email,
         password_hash=staged_data["password_hash"],
-        user_type=staged_data.get("user_type", "applicant"),
+        user_type="applicant",
         home_unit_id=staged_data.get("home_unit_id"),
     )
 
     user_id = created["user_id"]
     user_type = created["user_type"]
-
-    # If approver, assign to default academic review group
-    if user_type == "approver":
-        assign_user_to_group(user_id, access_id=1, member_role="Approver", can_approve=True)
 
     groups_data = get_user_approval_groups(user_id)
     groups = [

@@ -59,7 +59,7 @@ def get_user_approval_groups(user_id: int) -> List[Dict[str, Any]]:
             gm.can_approve
         FROM group_members gm
         JOIN approval_groups ag ON gm.access_id = ag.access_id
-        WHERE gm.user_id = %s AND ag.is_active = true;
+        WHERE gm.user_id = %s AND ag.is_active = true AND gm.left_at IS NULL;
     """
     with get_db_cursor(commit=False) as cur:
         cur.execute(query, (user_id,))
@@ -127,6 +127,9 @@ def ensure_default_accounts() -> None:
     else:
         approver_id = existing_approver["user_id"]
 
-    # Assign approver to primary approval groups (Registrar / Estate)
-    assign_user_to_group(approver_id, access_id=1, member_role="Chief Approver", can_approve=True)
-    assign_user_to_group(approver_id, access_id=4, member_role="Faculty Incharge", can_approve=True)
+    # Explicit local demo only: use configured groups, never assume fixed IDs.
+    with get_db_cursor(commit=False) as cur:
+        cur.execute("SELECT access_id FROM approval_groups WHERE is_active")
+        group_ids = [row["access_id"] for row in cur.fetchall()]
+    for access_id in group_ids:
+        assign_user_to_group(approver_id, access_id=access_id, member_role="Demo Approver", can_approve=True)

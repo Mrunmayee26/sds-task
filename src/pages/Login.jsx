@@ -13,7 +13,6 @@ import {
   authenticate,
   dashboardForRole,
   getDemoSession,
-  isDevelopmentMockAuthEnabled,
 } from '../services/demoAuth.js';
 import { AuthBrandPanel } from '../components';
 import styles from './Login.module.css';
@@ -22,7 +21,6 @@ export default function Login() {
   const navigate = useNavigate();
   const location = useLocation();
   const currentSession = getDemoSession();
-  const mockAuthEnabled = isDevelopmentMockAuthEnabled();
   const [role, setRole] = useState('applicant');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

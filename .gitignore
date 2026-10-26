@@ -33,6 +33,8 @@ __pycache__/
 .venv/
 venv/
 ENV/
+.pytest_cache/
+.test-postgres/
 backend/.env
 backend/.env.*
 !backend/.env.example
