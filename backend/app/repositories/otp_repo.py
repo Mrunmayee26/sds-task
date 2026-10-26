@@ -6,23 +6,6 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 from app.db.session import get_db_cursor
 
-def init_otp_table() -> None:
-    """Ensure the email_otps staging table exists in PostgreSQL."""
-    query = """
-        CREATE TABLE IF NOT EXISTS email_otps (
-            id SERIAL PRIMARY KEY,
-            email VARCHAR(255) NOT NULL,
-            otp_code VARCHAR(6) NOT NULL,
-            payload JSONB NOT NULL,
-            created_at TIMESTAMPTZ DEFAULT NOW(),
-            expires_at TIMESTAMPTZ NOT NULL,
-            is_verified BOOLEAN DEFAULT FALSE
-        );
-        CREATE INDEX IF NOT EXISTS idx_email_otps_email ON email_otps(email);
-    """
-    with get_db_cursor(commit=True) as cur:
-        cur.execute(query)
-
 def save_otp(
     email: str,
     otp_code: str,
@@ -30,7 +13,6 @@ def save_otp(
     expires_in_minutes: int = 10
 ) -> Dict[str, Any]:
     """Store an OTP and pending registration payload with an expiration timestamp."""
-    init_otp_table()
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=expires_in_minutes)
     
     # Invalidate previous unverified OTPs for this email
@@ -59,7 +41,6 @@ def verify_and_consume_otp(email: str, otp_code: str) -> Optional[Dict[str, Any]
     Check if the provided OTP matches an active, non-expired record.
     If valid, marks it verified and returns the stored registration payload.
     """
-    init_otp_table()
     query = """
         SELECT id, payload, expires_at 
         FROM email_otps
@@ -83,7 +64,6 @@ def verify_and_consume_otp(email: str, otp_code: str) -> Optional[Dict[str, Any]
 
 def get_latest_pending_payload(email: str) -> Optional[Dict[str, Any]]:
     """Retrieve the most recent unverified registration payload for resending OTP."""
-    init_otp_table()
     query = """
         SELECT payload 
         FROM email_otps

@@ -107,10 +107,10 @@ def create_booking(data, user_id):
 
         cur.execute("""
             INSERT INTO applications (applicant_user_id, venue_id, target_access_id,
-                application_type, purpose, description, expected_attendance, status, submitted_at)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, 'submitted', NOW()) RETURNING application_id
+                application_type, purpose, description, status, submitted_at)
+            VALUES (%s, %s, %s, %s, %s, %s, 'submitted', NOW()) RETURNING application_id
         """, (user_id, data.venue_id, venue["access_id"], data.application_type,
-              data.purpose, data.description, data.expected_attendance))
+              data.purpose, data.description))
         booking_id = cur.fetchone()["application_id"]
         cur.execute("""
             INSERT INTO booking_slots (application_id, venue_id, start_time, end_time, slot_status)
@@ -134,7 +134,7 @@ def lock_booking(cur, booking_id):
     return cur.fetchone(), venue
 
 
-def cancel_booking(booking_id, user_id, reason):
+def cancel_booking(booking_id, user_id):
     with get_db_cursor() as cur:
         booking, venue = lock_booking(cur, booking_id)
         if booking["applicant_user_id"] != user_id:
@@ -144,7 +144,7 @@ def cancel_booking(booking_id, user_id, reason):
         cur.execute("SELECT 1 FROM booking_slots WHERE application_id = %s AND start_time <= NOW()", (booking_id,))
         if cur.fetchone():
             raise HTTPException(409, "A booking that has started cannot be cancelled")
-        cur.execute("UPDATE applications SET status = 'cancelled', cancellation_reason = %s WHERE application_id = %s", (reason, booking_id))
+        cur.execute("UPDATE applications SET status = 'cancelled' WHERE application_id = %s", (booking_id,))
         release_slots(cur, booking_id)
         return read_booking(cur, booking_id)
 

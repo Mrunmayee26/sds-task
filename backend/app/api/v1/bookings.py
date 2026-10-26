@@ -2,7 +2,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import get_current_user
 from app.models.auth import UserProfile
-from app.models.booking import BookingCreate, BookingDecision, BookingCancel
+from app.models.booking import BookingCreate, BookingDecision
 from app.repositories import booking_repo
 
 router = APIRouter()
@@ -27,8 +27,8 @@ def booking_details(booking_id: int, user: UserProfile = Depends(get_current_use
 
 
 @router.post("/{booking_id}/cancel")
-def cancel_booking(booking_id: int, data: BookingCancel, user: UserProfile = Depends(get_current_user)):
-    return booking_repo.cancel_booking(booking_id, user.user_id, data.reason)
+def cancel_booking(booking_id: int, user: UserProfile = Depends(get_current_user)):
+    return booking_repo.cancel_booking(booking_id, user.user_id)
 
 
 @router.patch("/{booking_id}/status")

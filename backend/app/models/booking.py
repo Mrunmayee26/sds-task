@@ -31,8 +31,3 @@ class BookingDecision(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     status: Literal["approved", "rejected"]
     remarks: str = Field(default="", max_length=2000)
-
-
-class BookingCancel(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
-    reason: str = Field(default="Cancelled by applicant", min_length=1, max_length=2000)

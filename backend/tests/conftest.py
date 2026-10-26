@@ -27,8 +27,6 @@ def database(tmp_path_factory):
     with psycopg2.connect(database_url) as conn:
         with conn.cursor() as cur:
             cur.execute((BACKEND / "sql/schema.sql").read_text())
-            cur.execute((BACKEND / "sql/migrations/001_booking_fields.sql").read_text())
-            cur.execute((BACKEND / "sql/migrations/001_booking_fields.sql").read_text())
     yield database_url
     close_db_pool()
     server.cleanup()

@@ -1,8 +1,8 @@
 # COEP VenueFlow
 
 The FastAPI/PostgreSQL backend for Person 3 and Person 4 is now implemented.
-See [backend/README.md](backend/README.md) for Supabase configuration, the additive
-migration, API examples and tests. React's booking pages currently use the local
+See [backend/README.md](backend/README.md) for Supabase configuration,
+API examples and tests. React's booking pages currently use the local
 demo service; connect them using the documented backend contract.
 
 COEP VenueFlow is a React + Vite frontend for browsing campus venues and submitting, reviewing, and tracking venue booking requests. It currently runs in local demo mode: bookings and notifications are stored in the browser's `localStorage`. They are not shared between users or backed by a database.

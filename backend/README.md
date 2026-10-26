@@ -27,23 +27,24 @@ Edit `backend/.env` locally:
 - Configure SMTP for real registration emails. With `SMTP_ENABLED=false`, OTPs
   appear in the server's INFO logs for local development.
 
-Apply the additive migration, then start the API:
+Start the API using the existing database:
 
 ```powershell
-.venv/Scripts/python manage.py migrate
 .venv/Scripts/python -m uvicorn app.main:app --reload --log-level info
 ```
 
-The migration adds `expected_attendance` and `cancellation_reason` to
-`applications`, plus indexes. It preserves existing tables, venues, users and
-bookings. Review `sql/migrations/001_booking_fields.sql` before running it.
+Booking operations use the documented existing Supabase tables. The application
+does not create or alter tables automatically. OTP registration requires the
+existing `email_otps` table from the authentication backend; if that table is
+absent, email registration cannot work until its storage is provided. Login for
+existing users and booking operations do not require that table.
 Do **not** run `sql/schema.sql` or `sql/demo_catalog.sql` on your existing Supabase
 database; those files are only for a fresh local database.
 
 Open http://localhost:8000/docs to try the API, or `/health` to check the database.
 Database credentials remain in `backend/.env`, which is ignored by Git. No
-Supabase credentials were available in this checkout, so the live Supabase
-migration has not been applied or verified here.
+Supabase credentials were available when the backend was implemented, so the live
+connection has not been verified here.
 
 ## Code map
 
@@ -59,7 +60,6 @@ migration has not been applied or verified here.
 | `app/repositories/booking_repo.py` | Booking, cancellation and approval rules |
 | `app/api/v1/auth.py` | Existing login, registration, OTP and profile APIs |
 | `sql/schema.sql` | Complete schema for a fresh local database |
-| `sql/migrations/` | Additive changes for existing Supabase databases |
 
 ## API contract
 
@@ -77,7 +77,7 @@ strings. Use IDs returned by the venue API. Dates must include a timezone, e.g.
 | GET | `/bookings` | Your bookings; optional `status`, `limit`, `offset` |
 | GET | `/bookings?scope=review` | Bookings assigned to your active approval groups |
 | GET | `/bookings/{application_id}` | Details, time slots, approval stages and decision history |
-| POST | `/bookings/{application_id}/cancel` | Owner cancellation; body `{"reason":"Event moved"}` |
+| POST | `/bookings/{application_id}/cancel` | Owner cancellation; no request body required |
 | PATCH | `/bookings/{application_id}/status` | Assigned reviewer decision; body `{"status":"approved","remarks":"OK"}` or `rejected` |
 | POST | `/auth/register` | Start applicant registration and send OTP |
 | POST | `/auth/verify-otp` | Verify email and create applicant account |
@@ -114,6 +114,9 @@ connection failures 503.
 
 - Start time must be in the future; end time must be after start time. Attendance
   must be positive and cannot exceed a known venue capacity.
+  Attendance is validated at submission but is not saved because the existing
+  database has no attendance column. Cancellation updates the existing status and
+  slot timestamps; cancellation reasons are not collected or stored.
 - Each submission creates one application, one pending time slot, and its
   approval stages in one transaction. There is no second `bookings` table:
   the existing `applications` and `booking_slots` tables hold bookings.
@@ -183,6 +186,6 @@ database URLs. Run `seed-local` once on a fresh schema.
 ```
 
 Tests start and stop their own disposable local PostgreSQL server with `pgserver`.
-They never connect to Supabase. They cover migrations, persistence, auth, ownership,
+They never connect to Supabase. They cover persistence, auth, ownership,
 availability, validation, adjacent slots, rejection/cancellation, approval ordering,
 multi-vote approval and simultaneous conflicting requests.

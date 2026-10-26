@@ -50,9 +50,9 @@ For the complete schema, column types, relationships, and queries, refer to `bac
 Person 3/4 implementation is available under `backend/app`: `/api/v1/venues`,
 availability, authenticated `/api/v1/bookings`, cancellation and multi-stage group
 decisions. `backend/README.md` is the current setup and API contract. Existing
-Supabase installations need `backend/sql/migrations/001_booking_fields.sql`.
-The live database has not been migrated in this checkout because credentials were
-not present. Tests use a separate disposable PostgreSQL database.
+The backend uses the existing documented Supabase schema without requiring schema
+changes. The live connection has not been verified here.
+Tests use a separate disposable PostgreSQL database.
 
 `src/services/apiClient.js` is a Fetch wrapper configured by `VITE_API_BASE_URL`.
 Authentication is connected; the booking workflow still uses its local demo service.

@@ -1,5 +1,5 @@
 -- Run once on an EMPTY local PostgreSQL database. Existing Supabase databases
--- already have these tables: run migrations/001_booking_fields.sql there instead.
+-- already have these tables: connect directly without running this file there.
 BEGIN;
 CREATE TABLE organizational_units (
     unit_id SERIAL PRIMARY KEY, unit_name VARCHAR(150) NOT NULL,
@@ -45,8 +45,7 @@ CREATE TABLE applications (
     application_id SERIAL PRIMARY KEY, applicant_user_id INTEGER NOT NULL REFERENCES users,
     venue_id INTEGER REFERENCES venues, target_access_id INTEGER REFERENCES approval_groups,
     application_type VARCHAR(40) NOT NULL, purpose VARCHAR(255) NOT NULL,
-    description TEXT, expected_attendance INTEGER CHECK (expected_attendance > 0),
-    cancellation_reason TEXT,
+    description TEXT,
     status VARCHAR(30) NOT NULL DEFAULT 'draft'
         CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), submitted_at TIMESTAMPTZ

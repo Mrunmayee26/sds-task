@@ -42,9 +42,8 @@ def test_booking_lifecycle_and_privacy(client, headers, booking):
     assert len(approved.json()["events"]) == 1
     assert client.patch(path + "/status", json={"status": "rejected"}, headers=headers(2)).status_code == 409
     assert client.post(path + "/cancel", json={}, headers=headers(3)).status_code == 403
-    cancelled = client.post(path + "/cancel", json={"reason": "Event moved"}, headers=headers(1))
+    cancelled = client.post(path + "/cancel", headers=headers(1))
     assert cancelled.json()["status"] == "cancelled"
-    assert cancelled.json()["cancellation_reason"] == "Event moved"
     assert cancelled.json()["slots"][0]["slot_status"] == "cancelled"
     create(client, headers, booking)
 

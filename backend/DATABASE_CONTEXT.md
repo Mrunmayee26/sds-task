@@ -2,10 +2,9 @@
 
 > Implementation update: venue, availability, booking, cancellation and multi-stage
 > approval APIs now exist under `/api/v1`. See `README.md` in this directory for
-> the current contract. Existing Supabase databases need
-> `sql/migrations/001_booking_fields.sql` (attendance, cancellation reason and
-> indexes). This checkout had no Supabase credentials, so the live migration has
-> not been applied here. Historical record counts below have not been reverified.
+> the current contract. The backend uses the existing documented tables without
+> requiring schema changes. The live connection and historical record counts below
+> have not been reverified.
 
 > **Quick Reference Document**: This document caches the complete schema, relationships, row counts, and architectural status of the Supabase PostgreSQL database and FastAPI backend. Agents and developers should read this file directly to avoid re-querying or re-analyzing the live database.
 
@@ -138,8 +137,6 @@ Booking requests created by applicants.
 | `application_type` | `varchar(40)` | NO | - | Academic, Cultural, Workshop, etc. |
 | `purpose` | `varchar(255)` | NO | - | Event title / purpose |
 | `description` | `text` | YES | - | Detailed description |
-| `expected_attendance` | `integer` | YES | - | Positive attendance; added by migration 001 |
-| `cancellation_reason` | `text` | YES | - | Owner's reason; added by migration 001 |
 | `status` | `varchar(30)` | NO | `'draft'` | `'draft'`, `'submitted'`, `'approved'`, `'rejected'`, `'cancelled'` |
 | `created_at` | `timestamptz` | NO | `now()` | Created timestamp |
 | `submitted_at` | `timestamptz` | YES | - | Submission timestamp |
