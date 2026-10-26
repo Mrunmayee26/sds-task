@@ -1,33 +1,46 @@
-import { useEffect, useState } from 'react';
-import {
-  getAllBookings,
-  getApplicantBookings,
-  getNotifications,
-} from '../services/bookingService';
+import { useCallback, useEffect, useState } from 'react';
+import { getBookings, getVenues } from '../services/bookingService';
 
-/** Subscribe React views to the local development store's change events. */
-export function useBookings(scope = 'all') {
-  const read = scope === 'applicant' ? getApplicantBookings : getAllBookings;
-  const eventName = 'coep_bookings_changed';
-  const [bookings, setBookings] = useState(read);
+export function useBookingData(kind, scope = 'mine') {
+  const [data, setData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [version, setVersion] = useState(0);
+  const refresh = useCallback(() => setVersion((value) => value + 1), []);
 
   useEffect(() => {
-    const refresh = () => setBookings(read());
-    window.addEventListener(eventName, refresh);
-    return () => window.removeEventListener(eventName, refresh);
-  }, [read]);
-
-  return bookings;
-}
-
-export function useNotifications() {
-  const [notifications, setNotifications] = useState(getNotifications);
+    const controller = new AbortController();
+    const request =
+      kind === 'venues'
+        ? getVenues(controller.signal)
+        : getBookings(scope, controller.signal);
+    request
+      .then((rows) => {
+        if (!controller.signal.aborted) {
+          setData(rows);
+          setError('');
+        }
+      })
+      .catch((failure) => {
+        if (!controller.signal.aborted) setError(failure.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
+      });
+    return () => controller.abort();
+  }, [kind, scope, version]);
 
   useEffect(() => {
-    const refresh = () => setNotifications(getNotifications());
-    window.addEventListener('coep_notifications_changed', refresh);
-    return () => window.removeEventListener('coep_notifications_changed', refresh);
-  }, []);
-
-  return notifications;
+    window.addEventListener('venueflow_bookings_changed', refresh);
+    window.addEventListener('focus', refresh);
+    const timer = setInterval(() => {
+      if (!document.hidden) refresh();
+    }, 30000);
+    return () => {
+      window.removeEventListener('venueflow_bookings_changed', refresh);
+      window.removeEventListener('focus', refresh);
+      clearInterval(timer);
+    };
+  }, [refresh]);
+  return { data, loading, error, refresh };
 }

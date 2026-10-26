@@ -81,7 +81,6 @@
 .submit:focus-visible { outline: 3px solid rgba(112, 71, 235, .55); outline-offset: 3px; }
 .createAccount { margin-top: 24px; color: var(--color-text-secondary); font-size: 11px; text-align: center; }
 .createAccount .textLink { font-size: inherit; }
-.demoDisclaimer { margin-top: 20px; color: #aaa6b4; font-size: 9px; line-height: 1.5; text-align: center; }
 
 @media (max-width: 900px) {
   .page { grid-template-columns: minmax(280px, 39%) minmax(0, 1fr); }
