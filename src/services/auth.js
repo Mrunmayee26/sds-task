@@ -123,3 +123,25 @@ export async function fetchDepartments() {
     return [];
   }
 }
+
+export async function updateProfile(data) {
+  try {
+    const updatedUser = await apiRequest('api/v1/auth/profile', {
+      method: 'PUT',
+      body: data,
+    });
+    const session = getSession();
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    if (session && token) {
+      saveSession(
+        updatedUser,
+        token,
+        session.role || updatedUser.user_type || 'applicant',
+      );
+    }
+    return { ok: true, user: updatedUser };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+

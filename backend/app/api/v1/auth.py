@@ -11,6 +11,7 @@ from app.models.auth import (
     UserLoginRequest,
     TokenResponse,
     UserProfile,
+    UserProfileUpdate,
     ApprovalGroupBrief,
     RegisterInitResponse,
     VerifyOtpRequest,
@@ -19,11 +20,13 @@ from app.models.auth import (
 )
 from app.repositories.user_repo import (
     get_user_by_email,
+    get_user_by_id,
     get_user_approval_groups,
     create_user,
     assign_user_to_group,
     get_all_organizational_units,
     get_approval_group_for_unit,
+    update_user_profile,
 )
 from app.repositories.otp_repo import (
     save_otp,
@@ -300,3 +303,51 @@ def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
     Retrieves the currently authenticated user's profile and active approval groups.
     """
     return current_user
+
+@router.put("/profile", response_model=UserProfile)
+def update_profile(
+    payload: UserProfileUpdate,
+    current_user: UserProfile = Depends(get_current_user)
+):
+    """
+    Updates the display name and home department of the currently logged-in user.
+    """
+    updated = update_user_profile(
+        user_id=current_user.user_id,
+        full_name=payload.full_name,
+        home_unit_id=payload.home_unit_id,
+    )
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found or update failed.",
+        )
+
+    fresh_user = get_user_by_id(current_user.user_id)
+    if not fresh_user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User profile could not be reloaded.",
+        )
+
+    groups_data = get_user_approval_groups(current_user.user_id)
+    groups = [
+        ApprovalGroupBrief(
+            access_id=g["access_id"],
+            group_name=g["group_name"],
+            member_role=g["member_role"],
+            can_approve=g["can_approve"]
+        ) for g in groups_data
+    ]
+
+    return UserProfile(
+        user_id=fresh_user["user_id"],
+        full_name=fresh_user["full_name"],
+        email=fresh_user["email"],
+        user_type=fresh_user["user_type"],
+        home_unit_id=fresh_user["home_unit_id"],
+        unit_name=fresh_user.get("unit_name"),
+        is_active=fresh_user["is_active"],
+        approval_groups=groups,
+    )
+

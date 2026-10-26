@@ -122,3 +122,21 @@ def assign_user_to_group(
     """
     with get_db_cursor(commit=True) as cur:
         cur.execute(query, (access_id, user_id, member_role, can_approve))
+
+def update_user_profile(
+    user_id: int,
+    full_name: str,
+    home_unit_id: Optional[int] = None
+) -> Optional[Dict[str, Any]]:
+    """Update user's display name and home organizational unit."""
+    query = """
+        UPDATE users
+        SET full_name = %s, home_unit_id = %s
+        WHERE user_id = %s
+        RETURNING user_id, full_name, email, user_type, home_unit_id, is_active;
+    """
+    with get_db_cursor(commit=True) as cur:
+        cur.execute(query, (full_name.strip(), home_unit_id, user_id))
+        row = cur.fetchone()
+        return dict(row) if row else None
+

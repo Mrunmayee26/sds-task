@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertTriangle } from 'lucide-react';
 import PortalLayout from '../layouts/PortalLayout';
 import { DataState, PageHeading } from '../components/BookingUI';
 import { useBookingData } from '../hooks/useBookingData';
@@ -29,6 +30,31 @@ export default function BookVenue() {
   const selected = venues.data.find(
     (venue) => venue.venue_id === Number(form.venue_id),
   );
+  const attendance = form.expected_attendance
+    ? Number(form.expected_attendance)
+    : 0;
+  const exceedsCapacity = Boolean(
+    selected?.capacity && attendance > selected.capacity,
+  );
+  const nearCapacity = Boolean(
+    selected?.capacity &&
+      attendance > selected.capacity * 0.85 &&
+      !exceedsCapacity,
+  );
+  const fillPercentage =
+    selected?.capacity && attendance
+      ? Math.min(100, Math.round((attendance / selected.capacity) * 100))
+      : 0;
+  const suggestedVenues = exceedsCapacity
+    ? venues.data.filter(
+        (v) =>
+          v.venue_id !== selected?.venue_id &&
+          v.is_active !== false &&
+          v.capacity &&
+          v.capacity >= attendance,
+      )
+    : [];
+
   const update = (event) => {
     setForm((previous) => ({
       ...previous,
@@ -78,6 +104,16 @@ export default function BookVenue() {
     if (submitLock.current) return;
     if (!selected) {
       setError('Choose an active venue.');
+      return;
+    }
+    if (selected.capacity && Number(form.expected_attendance) > selected.capacity) {
+      setError(
+        `Expected attendance (${form.expected_attendance}) exceeds the maximum capacity of ${selected.venue_name} (${selected.capacity} seats). Please reduce attendance or select a larger venue.`,
+      );
+      return;
+    }
+    if (Number(form.expected_attendance) <= 0) {
+      setError('Expected attendance must be at least 1 person.');
       return;
     }
     if (end_time <= start_time) {
@@ -182,19 +218,124 @@ export default function BookVenue() {
                   </select>
                 </label>
                 <label>
-                  Expected attendance
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'baseline',
+                    }}
+                  >
+                    <span>Expected attendance</span>
+                    {selected?.capacity && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: exceedsCapacity ? '#b02c48' : '#7047eb',
+                        }}
+                      >
+                        Max: {selected.capacity} seats
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     name="expected_attendance"
                     value={form.expected_attendance}
                     onChange={update}
                     min="1"
-                    max={selected?.capacity || undefined}
                     step="1"
                     required
+                    placeholder={
+                      selected?.capacity
+                        ? `Up to ${selected.capacity} attendees`
+                        : 'Number of attendees'
+                    }
+                    style={
+                      exceedsCapacity
+                        ? { borderColor: '#ff4d5b', backgroundColor: '#fff8f9' }
+                        : {}
+                    }
                   />
                 </label>
               </div>
+              {exceedsCapacity && (
+                <div
+                  className="notice error"
+                  style={{
+                    margin: '0',
+                    display: 'grid',
+                    gap: 10,
+                    borderRadius: 10,
+                  }}
+                  role="alert"
+                >
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+                    <AlertTriangle
+                      size={18}
+                      style={{ flexShrink: 0, marginTop: 2 }}
+                    />
+                    <div>
+                      <strong>Capacity Exceeded:</strong> You entered{' '}
+                      {attendance} attendees, but {selected.venue_name} only
+                      accommodates up to {selected.capacity} seats (
+                      {attendance - selected.capacity} seats over capacity).
+                    </div>
+                  </div>
+                  {suggestedVenues.length > 0 ? (
+                    <div
+                      style={{
+                        borderTop: '1px solid #ffd4dc',
+                        paddingTop: 8,
+                        fontSize: 11,
+                      }}
+                    >
+                      <p style={{ margin: '0 0 6px', fontWeight: 600 }}>
+                        Suggested venues that fit your attendance:
+                      </p>
+                      <div
+                        style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}
+                      >
+                        {suggestedVenues.slice(0, 3).map((v) => (
+                          <button
+                            key={v.venue_id}
+                            type="button"
+                            className="button secondary"
+                            style={{
+                              minHeight: 32,
+                              padding: '5px 12px',
+                              fontSize: 11,
+                              background: '#fff',
+                            }}
+                            onClick={() => {
+                              setForm((prev) => ({
+                                ...prev,
+                                venue_id: String(v.venue_id),
+                              }));
+                              setError('');
+                            }}
+                          >
+                            Switch to {v.venue_name} ({v.capacity} seats)
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p style={{ margin: 0, fontSize: 11 }}>
+                      Please reduce the expected attendance to reserve this space.
+                    </p>
+                  )}
+                </div>
+              )}
+              {nearCapacity && (
+                <p
+                  className="notice warning"
+                  style={{ margin: 0, padding: '10px 14px', fontSize: 11 }}
+                >
+                  ℹ️ Note: This booking utilizes {fillPercentage}% of{' '}
+                  {selected.venue_name}'s capacity ({selected.capacity} seats).
+                </p>
+              )}
               <label>
                 Event description
                 <textarea
@@ -263,10 +404,16 @@ export default function BookVenue() {
                   className="button primary"
                   type="submit"
                   disabled={
-                    submitting || currentAvailability?.available === false
+                    submitting ||
+                    currentAvailability?.available === false ||
+                    exceedsCapacity
                   }
                 >
-                  {submitting ? 'Submitting…' : 'Submit request'}
+                  {submitting
+                    ? 'Submitting…'
+                    : exceedsCapacity
+                      ? 'Exceeds venue capacity'
+                      : 'Submit request'}
                 </button>
               </div>
             </form>
@@ -280,9 +427,78 @@ export default function BookVenue() {
                 <>
                   <p>
                     {selected.capacity
-                      ? `${selected.capacity} seats`
+                      ? `${selected.capacity} seats capacity`
                       : 'Capacity not specified'}
                   </p>
+                  {attendance > 0 && selected.capacity && (
+                    <div style={{ margin: '10px 0' }}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          fontSize: 11,
+                          marginBottom: 6,
+                        }}
+                      >
+                        <span>Capacity utilization</span>
+                        <strong
+                          style={{
+                            color: exceedsCapacity
+                              ? '#b02c48'
+                              : nearCapacity
+                                ? '#a96d0e'
+                                : '#22815d',
+                          }}
+                        >
+                          {attendance} / {selected.capacity} ({fillPercentage}%)
+                        </strong>
+                      </div>
+                      <div
+                        style={{
+                          background: '#eee8f5',
+                          borderRadius: 6,
+                          height: 7,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: `${Math.min(100, (attendance / selected.capacity) * 100)}%`,
+                            height: '100%',
+                            background: exceedsCapacity
+                              ? '#ff4d5b'
+                              : nearCapacity
+                                ? '#f2c080'
+                                : '#80c8a7',
+                            borderRadius: 6,
+                            transition: 'width 0.2s',
+                          }}
+                        />
+                      </div>
+                      {exceedsCapacity ? (
+                        <small
+                          style={{
+                            color: '#b02c48',
+                            display: 'block',
+                            marginTop: 5,
+                            fontWeight: 600,
+                          }}
+                        >
+                          Exceeds by {attendance - selected.capacity} seats
+                        </small>
+                      ) : nearCapacity ? (
+                        <small
+                          style={{
+                            color: '#a96d0e',
+                            display: 'block',
+                            marginTop: 5,
+                          }}
+                        >
+                          Near venue capacity
+                        </small>
+                      ) : null}
+                    </div>
+                  )}
                   <hr />
                   <p className="eyebrow">REVIEWED BY</p>
                   <p>{selected.primary_approval_group}</p>

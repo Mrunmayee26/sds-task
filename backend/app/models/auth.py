@@ -50,6 +50,10 @@ class UserProfile(BaseModel):
     is_active: bool
     approval_groups: List[ApprovalGroupBrief] = []
 
+class UserProfileUpdate(BaseModel):
+    full_name: str = Field(min_length=2, max_length=150, description="Full display name")
+    home_unit_id: Optional[int] = Field(default=None, description="Department / organizational unit ID")
+
 class TokenResponse(BaseModel):
     access_token: Optional[str] = ""
     token_type: str = "bearer"
