@@ -15,12 +15,19 @@ class UserRegisterRequest(BaseModel):
     role: str = Field(default="applicant", description="Role: 'applicant' or 'approver'")
     identifier: Optional[str] = None
     home_unit_id: Optional[int] = None
+    designation: Optional[str] = Field(default=None, max_length=100, description="Approver designation or title")
 
     def get_full_name(self) -> str:
         if self.full_name and self.full_name.strip():
             return self.full_name.strip()
         parts = [p.strip() for p in (self.firstName, self.lastName) if p and p.strip()]
         return " ".join(parts) if parts else self.email.split("@")[0]
+
+class UserDepartmentBrief(BaseModel):
+    unit_id: int
+    unit_name: str
+    unit_code: Optional[str] = None
+    unit_type: Optional[str] = None
 
 class UserLoginRequest(BaseModel):
     email: str = Field(pattern=EMAIL_PATTERN)
@@ -44,9 +51,11 @@ class UserProfile(BaseModel):
     approval_groups: List[ApprovalGroupBrief] = []
 
 class TokenResponse(BaseModel):
-    access_token: str
+    access_token: Optional[str] = ""
     token_type: str = "bearer"
-    user: UserProfile
+    user: Optional[UserProfile] = None
+    status: str = "verified"
+    message: Optional[str] = None
 
 class RegisterInitResponse(BaseModel):
     status: str = "otp_sent"

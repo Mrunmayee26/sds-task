@@ -7,6 +7,8 @@ from .user_repo import (
     get_user_approval_groups,
     create_user,
     assign_user_to_group,
+    get_all_organizational_units,
+    get_approval_group_for_unit,
 )
 from .otp_repo import (
     save_otp,
@@ -20,6 +22,8 @@ __all__ = [
     "get_user_approval_groups",
     "create_user",
     "assign_user_to_group",
+    "get_all_organizational_units",
+    "get_approval_group_for_unit",
     "save_otp",
     "verify_and_consume_otp",
     "get_latest_pending_payload",

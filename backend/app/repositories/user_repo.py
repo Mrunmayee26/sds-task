@@ -69,17 +69,43 @@ def create_user(
     email: str,
     password_hash: str,
     user_type: str = "applicant",
-    home_unit_id: Optional[int] = None
+    home_unit_id: Optional[int] = None,
+    is_active: bool = True
 ) -> Dict[str, Any]:
     """Insert a new user record into the database."""
     query = """
         INSERT INTO users (full_name, email, password_hash, user_type, home_unit_id, is_active)
-        VALUES (%s, %s, %s, %s, %s, true)
+        VALUES (%s, %s, %s, %s, %s, %s)
         RETURNING user_id, full_name, email, user_type, home_unit_id, is_active, created_at;
     """
     with get_db_cursor(commit=True) as cur:
-        cur.execute(query, (full_name.strip(), email.strip().lower(), password_hash, user_type, home_unit_id))
+        cur.execute(query, (full_name.strip(), email.strip().lower(), password_hash, user_type, home_unit_id, is_active))
         return dict(cur.fetchone())
+
+def get_all_organizational_units() -> List[Dict[str, Any]]:
+    """Retrieve all campus departments and administrative units."""
+    query = """
+        SELECT unit_id, unit_name, unit_code, unit_type 
+        FROM organizational_units 
+        ORDER BY unit_name ASC;
+    """
+    with get_db_cursor(commit=False) as cur:
+        cur.execute(query)
+        return [dict(r) for r in cur.fetchall()]
+
+def get_approval_group_for_unit(unit_id: int) -> Optional[int]:
+    """Find the primary approval group mapped to an organizational unit."""
+    query = """
+        SELECT access_id 
+        FROM approval_groups 
+        WHERE unit_id = %s AND is_active = true 
+        ORDER BY access_id ASC 
+        LIMIT 1;
+    """
+    with get_db_cursor(commit=False) as cur:
+        cur.execute(query, (unit_id,))
+        row = cur.fetchone()
+        return row["access_id"] if row else None
 
 def assign_user_to_group(
     user_id: int,

@@ -5,6 +5,7 @@ import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
 from app.config import settings
+from typing import List
 from app.models.auth import (
     UserRegisterRequest,
     UserLoginRequest,
@@ -14,11 +15,15 @@ from app.models.auth import (
     RegisterInitResponse,
     VerifyOtpRequest,
     ResendOtpRequest,
+    UserDepartmentBrief,
 )
 from app.repositories.user_repo import (
     get_user_by_email,
     get_user_approval_groups,
     create_user,
+    assign_user_to_group,
+    get_all_organizational_units,
+    get_approval_group_for_unit,
 )
 from app.repositories.otp_repo import (
     save_otp,
@@ -35,6 +40,12 @@ def generate_otp() -> str:
     """Generate a secure 6-digit numeric OTP."""
     return f"{secrets.randbelow(900000) + 100000:06d}"
 
+@router.get("/departments", response_model=List[UserDepartmentBrief])
+def list_departments():
+    """Retrieve campus departments and academic units for approver registration."""
+    units = get_all_organizational_units()
+    return [UserDepartmentBrief(**u) for u in units]
+
 @router.post("/register", response_model=RegisterInitResponse, status_code=status.HTTP_200_OK)
 async def register_user(payload: UserRegisterRequest):
     """
@@ -42,8 +53,13 @@ async def register_user(payload: UserRegisterRequest):
     The user record is formally created in the database only after OTP confirmation.
     """
     normalized_email = payload.email.strip().lower()
-    if payload.role.strip().lower() != "applicant":
-        raise HTTPException(403, "Approver accounts must be assigned by an administrator.")
+    user_type = payload.role.strip().lower() if payload.role else "applicant"
+    if user_type not in ("applicant", "approver"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Role must be either 'applicant' or 'approver'."
+        )
+
     if not settings.SMTP_ENABLED:
         raise HTTPException(503, "Email verification is not configured. Contact the campus administrator to create an account.")
     
@@ -58,7 +74,6 @@ async def register_user(payload: UserRegisterRequest):
     # Hash password and prepare staged payload
     hashed_pwd = await run_in_threadpool(hash_password, payload.password)
     full_name = payload.get_full_name()
-    user_type = payload.role.strip().lower() if payload.role else "applicant"
 
     staged_payload = {
         "full_name": full_name,
@@ -67,6 +82,7 @@ async def register_user(payload: UserRegisterRequest):
         "user_type": user_type,
         "home_unit_id": payload.home_unit_id,
         "identifier": payload.identifier,
+        "designation": payload.designation,
     }
 
     # Generate 6-digit OTP and save in staging table
@@ -85,7 +101,9 @@ async def register_user(payload: UserRegisterRequest):
 @router.post("/verify-otp", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
 def verify_registration_otp(payload: VerifyOtpRequest):
     """
-    Verifies the 6-digit OTP. On success, creates the permanent user record in Supabase and issues a JWT token.
+    Verifies the 6-digit OTP.
+    For applicants: creates active user record in Supabase and issues a JWT token.
+    For approvers: creates user record with is_active=False pending admin verification.
     """
     normalized_email = payload.email.strip().lower()
     staged_data = verify_and_consume_otp(normalized_email, payload.otp.strip())
@@ -104,17 +122,44 @@ def verify_registration_otp(payload: VerifyOtpRequest):
             detail="This account has already been registered and verified.",
         )
 
+    user_type = staged_data.get("user_type", "applicant")
+    is_approver = user_type == "approver"
+    # Approver accounts MUST be approved by an administrator before activation
+    is_active = not is_approver
+
     # Permanently insert user into Supabase users table
     created = create_user(
         full_name=staged_data["full_name"],
         email=normalized_email,
         password_hash=staged_data["password_hash"],
-        user_type="applicant",
+        user_type=user_type,
         home_unit_id=staged_data.get("home_unit_id"),
+        is_active=is_active,
     )
 
     user_id = created["user_id"]
-    user_type = created["user_type"]
+
+    # If approver, map to their department's approval group
+    if is_approver:
+        unit_id = staged_data.get("home_unit_id")
+        access_id = get_approval_group_for_unit(unit_id) if unit_id else None
+        if not access_id:
+            access_id = 1  # Default fallback to Registrar Office
+
+        assign_user_to_group(
+            user_id=user_id,
+            access_id=access_id,
+            member_role=staged_data.get("designation") or "Department Approver",
+            can_approve=True
+        )
+
+        return TokenResponse(
+            access_token="",
+            token_type="bearer",
+            user=None,
+            status="pending_admin_approval",
+            message="Your email has been verified! Your approver account has been submitted for administrator verification. You will be able to log in once approved by the campus administration."
+        )
 
     groups_data = get_user_approval_groups(user_id)
     groups = [
@@ -142,7 +187,13 @@ def verify_registration_otp(payload: VerifyOtpRequest):
         claims={"email": normalized_email, "role": user_type}
     )
 
-    return TokenResponse(access_token=token, token_type="bearer", user=profile)
+    return TokenResponse(
+        access_token=token,
+        token_type="bearer",
+        user=profile,
+        status="verified",
+        message="Account verified and created successfully."
+    )
 
 @router.post("/resend-otp", response_model=RegisterInitResponse)
 async def resend_otp(payload: ResendOtpRequest):
@@ -195,6 +246,11 @@ def login_user(payload: UserLoginRequest):
         )
 
     if not user.get("is_active"):
+        if (user.get("user_type") or "").lower() == "approver":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Your approver account is pending administrator verification. Please wait for an administrator to approve your account before signing in.",
+            )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Your account has been deactivated. Please contact the administrator.",
