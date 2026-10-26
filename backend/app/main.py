@@ -15,15 +15,12 @@ from psycopg2 import OperationalError, InterfaceError
 from psycopg2.pool import PoolError
 from app.config import settings
 from app.db.session import init_db_pool, close_db_pool, test_db_connection
-from app.repositories.user_repo import ensure_default_accounts
 from app.api.v1 import api_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Fail clearly if the database is unavailable. Schema setup is explicit.
     init_db_pool()
-    if settings.SEED_DEMO_ACCOUNTS:
-        ensure_default_accounts()
     try:
         yield
     finally:

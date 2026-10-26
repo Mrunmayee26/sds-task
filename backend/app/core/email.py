@@ -2,6 +2,7 @@
 Email service using aiosmtplib for sending verification OTPs and transactional notifications.
 """
 import logging
+from html import escape
 from email.message import EmailMessage
 import aiosmtplib
 from app.config import settings
@@ -10,7 +11,7 @@ logger = logging.getLogger("venueflow.email")
 
 def create_otp_html(user_name: str, otp_code: str) -> str:
     """Generate clean HTML email template for verification OTP."""
-    name = user_name.strip() if user_name else "COEP Member"
+    name = escape(user_name.strip()) if user_name else "COEP Member"
     return f"""
     <!DOCTYPE html>
     <html>
@@ -46,11 +47,10 @@ def create_otp_html(user_name: str, otp_code: str) -> str:
 async def send_otp_email(to_email: str, otp_code: str, user_name: str = "") -> bool:
     """
     Send OTP verification email via SMTP.
-    If SMTP_ENABLED is false, logs the OTP to the application logger.
+    Returns false when delivery is unavailable. Verification codes are not logged.
     """
     if not settings.SMTP_ENABLED:
-        logger.info(f"SMTP disabled. Verification code for {to_email}: {otp_code}")
-        return True
+        return False
 
     try:
         msg = EmailMessage()

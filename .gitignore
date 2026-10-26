@@ -35,6 +35,8 @@ venv/
 ENV/
 .pytest_cache/
 .test-postgres/
+.playwright-cli/
+output/
 backend/.env
 backend/.env.*
 !backend/.env.example

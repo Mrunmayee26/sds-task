@@ -17,16 +17,14 @@ def database(tmp_path_factory):
     database_url = server.get_uri()
     # Real environment values take priority over .env; this is always a new local DB.
     os.environ["DATABASE_URL"] = database_url
-    os.environ["SEED_DEMO_ACCOUNTS"] = "false"
     os.environ["JWT_SECRET_KEY"] = "local-test-secret-not-for-production-0123456789"
     os.environ["SMTP_ENABLED"] = "false"
     from app.config import settings
     from app.db.session import close_db_pool
     settings.DATABASE_URL = database_url
-    settings.SEED_DEMO_ACCOUNTS = False
     with psycopg2.connect(database_url) as conn:
         with conn.cursor() as cur:
-            cur.execute((BACKEND / "sql/schema.sql").read_text())
+            cur.execute((BACKEND / "tests/fixtures/schema.sql").read_text())
     yield database_url
     close_db_pool()
     server.cleanup()
@@ -40,7 +38,7 @@ def client(database):
     with psycopg2.connect(database) as conn:
         with conn.cursor() as cur:
             cur.execute("TRUNCATE organizational_units, buildings, users, approval_groups, group_members, venues, venue_additional_approvals, applications, booking_slots, application_approvals, approval_events, email_otps RESTART IDENTITY CASCADE")
-            cur.execute((BACKEND / "sql/demo_catalog.sql").read_text())
+            cur.execute((BACKEND / "tests/fixtures/catalog.sql").read_text())
             password_hash = hash_password("TestPassword42")
             for name, role in [("Applicant", "applicant"), ("Reviewer", "approver"), ("Other", "applicant"), ("Second", "faculty")]:
                 cur.execute("INSERT INTO users (full_name, email, user_type, password_hash) VALUES (%s, %s, %s, %s)",

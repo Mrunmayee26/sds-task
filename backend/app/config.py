@@ -12,7 +12,6 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql://postgres:postgres@localhost:5432/postgres"
     DB_MIN_CONNECTIONS: int = 1
     DB_MAX_CONNECTIONS: int = 10
-    SEED_DEMO_ACCOUNTS: bool = False
 
     # JWT Authentication
     JWT_SECRET_KEY: str = Field(min_length=32)

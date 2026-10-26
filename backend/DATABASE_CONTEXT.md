@@ -4,7 +4,8 @@
 > approval APIs now exist under `/api/v1`. See `README.md` in this directory for
 > the current contract. The backend uses the existing documented tables without
 > requiring schema changes. The live connection and historical record counts below
-> have not been reverified.
+> were checked read-only during frontend integration. Historical record counts
+> below describe earlier snapshots and can change as the app is used.
 
 > **Quick Reference Document**: This document caches the complete schema, relationships, row counts, and architectural status of the Supabase PostgreSQL database and FastAPI backend. Agents and developers should read this file directly to avoid re-querying or re-analyzing the live database.
 
@@ -222,15 +223,16 @@ Immutable audit trail of actions taken on an approval step.
                     │ HTTP Fetch (via VITE_API_BASE_URL="http://localhost:8000")
                     ▼
 [ React + Vite Frontend (src/) ]
-  - Currently reads: src/data/venues.js (56 hardcoded items, null capacities)
-  - Needs update: fetch live venues from GET /api/v1/venues and connect booking APIs
+  - Reads the live catalog from GET /api/v1/venues
+  - Uses authenticated booking, profile, cancellation and approval APIs
+  - No runtime demo records or offline authentication fallback
 ```
 
 ---
 
 ## 6. Ready-to-Use Query for Venues API
 
-When creating `GET /api/venues`, use this optimized query:
+The catalog at `GET /api/v1/venues` uses joins like this:
 
 ```sql
 SELECT 

@@ -60,10 +60,11 @@ def list_bookings(user_id, scope, status, limit, offset):
         if scope == "review":
             condition = "EXISTS (SELECT 1 FROM application_approvals aa WHERE aa.application_id = a.application_id AND EXISTS (" + MEMBER_CHECK + "))"
         cur.execute("""
-            SELECT a.*, v.venue_name,
+            SELECT a.*, v.venue_name, u.full_name AS applicant_name,
                 (SELECT MIN(start_time) FROM booking_slots s WHERE s.application_id = a.application_id) AS start_time,
                 (SELECT MAX(end_time) FROM booking_slots s WHERE s.application_id = a.application_id) AS end_time
             FROM applications a JOIN venues v ON v.venue_id = a.venue_id
+            JOIN users u ON u.user_id = a.applicant_user_id
             WHERE """ + condition + """ AND (%s IS NULL OR a.status = %s)
             ORDER BY a.created_at DESC, a.application_id DESC LIMIT %s OFFSET %s
         """, (user_id, status, status, limit, offset))
@@ -110,7 +111,7 @@ def create_booking(data, user_id):
                 application_type, purpose, description, status, submitted_at)
             VALUES (%s, %s, %s, %s, %s, %s, 'submitted', NOW()) RETURNING application_id
         """, (user_id, data.venue_id, venue["access_id"], data.application_type,
-              data.purpose, data.description))
+              data.purpose, f"Expected attendance: {data.expected_attendance}\n\n{data.description}"))
         booking_id = cur.fetchone()["application_id"]
         cur.execute("""
             INSERT INTO booking_slots (application_id, venue_id, start_time, end_time, slot_status)

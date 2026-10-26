@@ -3,7 +3,6 @@ Data access repository for users and approval group memberships.
 """
 from typing import Any, Dict, List, Optional
 from app.db.session import get_db_cursor
-from app.core.security import hash_password
 
 def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
     """Retrieve user record along with department/unit name by email."""
@@ -97,39 +96,3 @@ def assign_user_to_group(
     """
     with get_db_cursor(commit=True) as cur:
         cur.execute(query, (access_id, user_id, member_role, can_approve))
-
-def ensure_default_accounts() -> None:
-    """Ensure baseline test accounts exist in the database with valid hashed passwords."""
-    # 1. Default Applicant (Maya Kulkarni - Student Lead)
-    applicant_email = "applicant@venueflow.test"
-    existing_applicant = get_user_by_email(applicant_email)
-    if not existing_applicant:
-        create_user(
-            full_name="Maya Kulkarni",
-            email=applicant_email,
-            password_hash=hash_password("ApplicantDemo!42"),
-            user_type="applicant",
-            home_unit_id=None
-        )
-
-    # 2. Default Approver (Dr. Sharma - Estate & Approvals)
-    approver_email = "approver@venueflow.test"
-    existing_approver = get_user_by_email(approver_email)
-    if not existing_approver:
-        approver = create_user(
-            full_name="Dr. Sharma",
-            email=approver_email,
-            password_hash=hash_password("ApproverDemo!42"),
-            user_type="approver",
-            home_unit_id=None
-        )
-        approver_id = approver["user_id"]
-    else:
-        approver_id = existing_approver["user_id"]
-
-    # Explicit local demo only: use configured groups, never assume fixed IDs.
-    with get_db_cursor(commit=False) as cur:
-        cur.execute("SELECT access_id FROM approval_groups WHERE is_active")
-        group_ids = [row["access_id"] for row in cur.fetchall()]
-    for access_id in group_ids:
-        assign_user_to_group(approver_id, access_id=access_id, member_role="Demo Approver", can_approve=True)

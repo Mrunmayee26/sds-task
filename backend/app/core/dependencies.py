@@ -96,7 +96,7 @@ def require_role(allowed_roles: List[str]):
 
 def require_approver(current_user: UserProfile = Depends(get_current_user)) -> UserProfile:
     """Ensures the authenticated user has approver privileges or group membership."""
-    has_approval_rights = current_user.user_type == "approver" or any(g.can_approve for g in current_user.approval_groups)
+    has_approval_rights = any(g.can_approve for g in current_user.approval_groups)
     if not has_approval_rights:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

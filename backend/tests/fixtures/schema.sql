@@ -1,5 +1,4 @@
--- Run once on an EMPTY local PostgreSQL database. Existing Supabase databases
--- already have these tables: connect directly without running this file there.
+-- Test schema for a disposable local PostgreSQL database only.
 BEGIN;
 CREATE TABLE organizational_units (
     unit_id SERIAL PRIMARY KEY, unit_name VARCHAR(150) NOT NULL,

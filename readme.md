@@ -1,69 +1,100 @@
 # COEP VenueFlow
 
-The FastAPI/PostgreSQL backend for Person 3 and Person 4 is now implemented.
-See [backend/README.md](backend/README.md) for Supabase configuration,
-API examples and tests. React's booking pages currently use the local
-demo service; connect them using the documented backend contract.
+A simple campus venue booking system built with React, FastAPI and the existing
+Supabase PostgreSQL database. Frontend screens read and save through the API;
+there are no demo records, hardcoded venue catalogs or offline login accounts.
 
-COEP VenueFlow is a React + Vite frontend for browsing campus venues and submitting, reviewing, and tracking venue booking requests. It currently runs in local demo mode: bookings and notifications are stored in the browser's `localStorage`. They are not shared between users or backed by a database.
+## Start the application
 
-## Run locally
+Backend (PowerShell, from the repository root):
 
-```sh
+```powershell
+cd backend
+python -m venv .venv
+.venv/Scripts/python -m pip install -r requirements.txt
+# For a new checkout only: copy .env.example to .env and configure it.
+.venv/Scripts/python -m uvicorn app.main:app --reload
+```
+
+Set `DATABASE_URL` and a random `JWT_SECRET_KEY` in `backend/.env`. Use your
+Supabase PostgreSQL connection string with `sslmode=require`. The backend uses
+the existing database schema; there is no migration or automatic table creation.
+See [backend setup](backend/README.md) for details.
+
+Frontend (a separate terminal, from the repository root):
+
+```powershell
 npm install
 npm run dev
 ```
 
-Mock login works in Vite development mode without an environment file. To customize local settings, create your own ignored file from the shareable template:
+Open http://localhost:5173. Vite forwards `/api` requests to the backend on port
+8000. If the API is hosted elsewhere, set `VITE_API_BASE_URL` to its origin in a
+local frontend `.env` file. In production, configure that variable or have your
+web server forward `/api` to FastAPI and serve `index.html` for frontend routes.
+Only the API URL belongs in frontend settings; database secrets stay in the backend.
 
-```sh
-cp .env.example .env.development
-```
+## Booking workflow
 
-In Windows PowerShell, use `Copy-Item .env.example .env.development`. The local `.env.development` file is ignored by Git and should not be committed. `.env.example` is the shareable template teammates can commit and copy.
+1. Sign in with an existing database account or create an applicant account using
+   email verification. Registration requires working SMTP settings.
+2. Browse the database venue catalog, search by venue or building, and filter by
+   type or capacity.
+3. Submit a booking with a future time slot, event details and attendance. Times
+   are entered and displayed in India Standard Time.
+4. The API reserves the slot and creates approval stages for the venue's groups.
+5. An assigned reviewer signs in using the Approver option, opens the request,
+   and approves or rejects it. Multiple stages and approval counts are supported.
+6. The applicant sees the current decision in My bookings and Schedule. An owner
+   can cancel a future pending or approved booking to release the reserved time.
 
-Set `VITE_API_BASE_URL=http://localhost:8000` for FastAPI login and registration.
-`VITE_ENABLE_DEMO_AUTH=false` disables the development-only offline login fallback.
-The current booking pages still use the browser-local demo service.
+Pages refresh from the API on focus, after changes and every 30 seconds. Refreshing
+the browser preserves database records. Empty lists stay empty and API failures
+show an error with a retry action.
 
-Available checks:
+## Accounts and permissions
 
-```sh
+JWTs are stored for the current browser session. The app verifies the account with
+`/api/v1/auth/me`, handles expired sessions, and uses the actual profile name and
+approval memberships. An assigned reviewer may switch between their applicant
+and reviewer workspaces without signing out.
+
+Public registration creates applicants only. The administrator assigns reviewers
+to `group_members` in the existing database. A venue needs enough eligible
+reviewers before accepting requests. User roles alone do not authorize decisions.
+
+When SMTP is disabled or delivery fails, registration reports that verification
+is unavailable. It never claims an email was sent successfully. Existing accounts
+can still sign in. Configure SMTP in `backend/.env` to enable self-registration.
+
+Profiles show stored account details and permissions. Profile edits and review
+membership changes are handled by the administrator. File uploads and browser-only
+notification/settings controls have been removed from the simple booking flow.
+
+## Main files
+
+| File | Responsibility |
+| --- | --- |
+| `src/App.jsx` | Routes and signed-in portal guards |
+| `src/services/auth.js` | API login, registration and session helpers |
+| `src/components/Auth/AuthProvider.jsx` | Verify the current account with the API |
+| `src/services/bookingService.js` | Venue and booking API calls |
+| `src/hooks/useBookingData.js` | Loading, errors and refreshes |
+| `src/pages/PortalPages.jsx` | Overview, venues, bookings, schedule and profile |
+| `src/pages/BookVenue.jsx` | Venue selection, availability and submission |
+| `src/pages/BookingDetails.jsx` | Approval stages, decisions and cancellation |
+| `src/layouts/PortalLayout.jsx` | Shared applicant/reviewer navigation |
+| `src/layouts/Portal.css` | Responsive portal styling |
+| `backend/app/` | Authentication, booking rules and SQL queries |
+
+## Checks
+
+```powershell
 npm run lint
 npm run build
+backend/.venv/Scripts/python -m pip install -r backend/requirements-dev.txt
+backend/.venv/Scripts/python -m pytest backend/tests -q
 ```
 
-## Portals and routes
-
-The login page is at `/`; the registration form is at `/register`. During local development, use the fictional test accounts in `src/services/demoAuth.js` and select the matching role. The Applicant account opens `/applicant/dashboard`; the Approver account opens `/approver/dashboard`. Applicant routes: `/applicant/dashboard`, `/applicant/venues`, `/applicant/book`, `/applicant/applications`, `/applicant/schedule`, and `/applicant/settings`. `/applicant` redirects to the dashboard after login.
-
-Approver routes: `/approver/dashboard`, `/approver/approvals`, `/approver/schedule`, `/approver/venues`, and `/approver/settings`. `/approver` and `/approvers` redirect to the dashboard after login. Portal routes require the matching frontend demo role; a user signed in for the other role is sent to their own dashboard. Portal switching clears the current demo session and returns to login.
-
-## Authentication
-
-- Login calls FastAPI, saves the returned JWT and user profile in session storage,
-  and sends the token on later API calls. Passwords are not stored.
-- Applicant registration verifies a six-digit email OTP. Configure SMTP on the backend.
-- Public signup cannot grant approver access. A database administrator assigns
-  group memberships to reviewers, as explained in `backend/README.md`.
-- If the API is unavailable, development builds can use the fictional accounts
-  in `src/services/demoAuth.js` when the mock flag is enabled. These preview accounts
-  do not authorize backend requests. Production builds disable the fallback.
-
-## Demo data and services
-
-- `src/data/venues.js` is the shared 56-item venue catalog. Venue IDs are stable; unverified capacities, amenities, descriptions, and rules remain `null` or empty.
-- `src/data/demo/` contains browser-local bookings, notifications, and other page-specific fixtures.
-- `src/services/bookingService.js` provides local booking, conflict-check, and notification operations. It validates date/time ranges and booking status transitions and broadcasts same-tab change events. Browser storage cannot provide server-side concurrency guarantees.
-- `src/data/demo/approverVenues.js` holds illustrative availability labels and sample bookings separately from venue specifications. Availability is not live or calculated from booking records.
-- `src/hooks/useBookingData.js` subscribes pages and layouts to the local service's change events.
-- Settings preferences are saved in this browser only. Uploaded supporting documents are not sent or persisted; only their filename appears in a booking record.
-
-## Booking API integration
-
-The backend booking APIs are ready; see `backend/README.md` for their contract.
-`src/services/apiClient.js` provides a Fetch wrapper with Bearer token handling.
-The current booking workflow remains local until the frontend service and hooks
-are connected to the asynchronous booking APIs.
-
-Never place Supabase credentials, service-role keys, or other secrets in Vite client environment variables. Supabase access and authorization belong behind the backend.
+Backend tests start a disposable local PostgreSQL database; they never use Supabase.
+For browser testing without changing campus data, see `backend/README.md`.

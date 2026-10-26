@@ -2,7 +2,8 @@
 Authentication endpoints for registration, OTP email verification, login, and user profile.
 """
 import secrets
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from starlette.concurrency import run_in_threadpool
 from app.config import settings
 from app.models.auth import (
     UserRegisterRequest,
@@ -35,7 +36,7 @@ def generate_otp() -> str:
     return f"{secrets.randbelow(900000) + 100000:06d}"
 
 @router.post("/register", response_model=RegisterInitResponse, status_code=status.HTTP_200_OK)
-def register_user(payload: UserRegisterRequest, background_tasks: BackgroundTasks):
+async def register_user(payload: UserRegisterRequest):
     """
     Initiates account registration by generating a 6-digit OTP and dispatching an email verification.
     The user record is formally created in the database only after OTP confirmation.
@@ -43,9 +44,11 @@ def register_user(payload: UserRegisterRequest, background_tasks: BackgroundTask
     normalized_email = payload.email.strip().lower()
     if payload.role.strip().lower() != "applicant":
         raise HTTPException(403, "Approver accounts must be assigned by an administrator.")
+    if not settings.SMTP_ENABLED:
+        raise HTTPException(503, "Email verification is not configured. Contact the campus administrator to create an account.")
     
     # Check if user already exists
-    existing = get_user_by_email(normalized_email)
+    existing = await run_in_threadpool(get_user_by_email, normalized_email)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -53,7 +56,7 @@ def register_user(payload: UserRegisterRequest, background_tasks: BackgroundTask
         )
 
     # Hash password and prepare staged payload
-    hashed_pwd = hash_password(payload.password)
+    hashed_pwd = await run_in_threadpool(hash_password, payload.password)
     full_name = payload.get_full_name()
     user_type = payload.role.strip().lower() if payload.role else "applicant"
 
@@ -68,10 +71,10 @@ def register_user(payload: UserRegisterRequest, background_tasks: BackgroundTask
 
     # Generate 6-digit OTP and save in staging table
     otp_code = generate_otp()
-    save_otp(normalized_email, otp_code, staged_payload, expires_in_minutes=10)
+    await run_in_threadpool(save_otp, normalized_email, otp_code, staged_payload, expires_in_minutes=10)
 
-    # Dispatch email asynchronously in background
-    background_tasks.add_task(send_otp_email, normalized_email, otp_code, full_name)
+    if not await send_otp_email(normalized_email, otp_code, full_name):
+        raise HTTPException(503, "Verification email could not be delivered. Please try again later.")
 
     return RegisterInitResponse(
         status="otp_sent",
@@ -142,12 +145,14 @@ def verify_registration_otp(payload: VerifyOtpRequest):
     return TokenResponse(access_token=token, token_type="bearer", user=profile)
 
 @router.post("/resend-otp", response_model=RegisterInitResponse)
-def resend_otp(payload: ResendOtpRequest, background_tasks: BackgroundTasks):
+async def resend_otp(payload: ResendOtpRequest):
     """
     Resends a fresh 6-digit OTP for a pending registration.
     """
     normalized_email = payload.email.strip().lower()
-    pending = get_latest_pending_payload(normalized_email)
+    if not settings.SMTP_ENABLED:
+        raise HTTPException(503, "Email verification is not configured. Contact the campus administrator.")
+    pending = await run_in_threadpool(get_latest_pending_payload, normalized_email)
 
     if not pending:
         raise HTTPException(
@@ -156,10 +161,11 @@ def resend_otp(payload: ResendOtpRequest, background_tasks: BackgroundTasks):
         )
 
     new_otp = generate_otp()
-    save_otp(normalized_email, new_otp, pending, expires_in_minutes=10)
+    await run_in_threadpool(save_otp, normalized_email, new_otp, pending, expires_in_minutes=10)
 
     user_name = pending.get("full_name", "")
-    background_tasks.add_task(send_otp_email, normalized_email, new_otp, user_name)
+    if not await send_otp_email(normalized_email, new_otp, user_name):
+        raise HTTPException(503, "Verification email could not be delivered. Please try again later.")
 
     return RegisterInitResponse(
         status="otp_sent",
@@ -197,7 +203,7 @@ def login_user(payload: UserLoginRequest):
     # Role validation if specified by login UI
     requested_role = (payload.role or "").strip().lower()
     groups_data = get_user_approval_groups(user["user_id"])
-    has_approval_rights = user["user_type"] == "approver" or any(g["can_approve"] for g in groups_data)
+    has_approval_rights = any(g["can_approve"] for g in groups_data)
 
     if requested_role == "approver" and not has_approval_rights:
         raise HTTPException(

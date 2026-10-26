@@ -30,6 +30,9 @@ def test_catalog_and_availability(client, headers, booking):
 def test_booking_lifecycle_and_privacy(client, headers, booking):
     booking_id = create(client, headers, booking)
     path = f"{BASE}/bookings/{booking_id}"
+    saved = client.get(path, headers=headers(1)).json()
+    assert saved["description"].startswith("Expected attendance: 30\n\n")
+    assert client.get(BASE + "/bookings", headers=headers(1)).json()[0]["applicant_name"] == "Applicant"
     assert client.get(path).status_code == 401
     assert client.get(path, headers=headers(3)).status_code == 403
     assert client.get(BASE + "/bookings", headers=headers(3)).json() == []
@@ -130,6 +133,7 @@ def test_login_and_current_user(client):
 
 
 def test_email_registration_and_otp_reuse(client, monkeypatch):
+    monkeypatch.setattr("app.api.v1.auth.settings.SMTP_ENABLED", True)
     sent = []
 
     async def capture_email(email, code, name):
@@ -150,6 +154,19 @@ def test_email_registration_and_otp_reuse(client, monkeypatch):
     assert verified.json()["user"]["approval_groups"] == []
     assert client.post(BASE + "/auth/verify-otp", json={"email": account["email"], "otp": sent[-1]}).status_code == 400
     assert client.post(BASE + "/auth/register", json=account).status_code == 409
+
+
+def test_registration_reports_missing_or_failed_email_delivery(client, monkeypatch):
+    account = {"email": "new@coep.ac.in", "password": "Password42", "full_name": "New Student"}
+    monkeypatch.setattr("app.api.v1.auth.settings.SMTP_ENABLED", False)
+    assert client.post(BASE + "/auth/register", json=account).status_code == 503
+    monkeypatch.setattr("app.api.v1.auth.settings.SMTP_ENABLED", True)
+
+    async def fail_delivery(*args):
+        return False
+
+    monkeypatch.setattr("app.api.v1.auth.send_otp_email", fail_delivery)
+    assert client.post(BASE + "/auth/register", json=account).status_code == 503
 
 
 def test_missing_reviewers_rolls_back_everything(client, database, headers, booking):

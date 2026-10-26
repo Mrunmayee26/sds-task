@@ -7,9 +7,9 @@ from pydantic import BaseModel, Field
 EMAIL_PATTERN = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
 class UserRegisterRequest(BaseModel):
-    firstName: Optional[str] = None
-    lastName: Optional[str] = None
-    full_name: Optional[str] = None
+    firstName: Optional[str] = Field(default=None, max_length=74)
+    lastName: Optional[str] = Field(default=None, max_length=75)
+    full_name: Optional[str] = Field(default=None, max_length=150)
     email: str = Field(pattern=EMAIL_PATTERN, description="Valid email address")
     password: str = Field(min_length=6, max_length=72, description="Password, maximum 72 UTF-8 bytes")
     role: str = Field(default="applicant", description="Role: 'applicant' or 'approver'")
