@@ -15,7 +15,7 @@ import {
   Clock,
   CheckCircle2,
 } from 'lucide-react';
-import { AuthBrandPanel } from '../components';
+import { AuthBrandPanel, RoleSelector, PendingApprovalScreen } from '../components';
 import {
   dashboardForRole,
   requestRegistrationOtp,
@@ -234,79 +234,14 @@ export default function CreateAccount() {
                 noValidate
               >
                 {/* Role Switcher */}
-                <fieldset className={authStyles.roleFieldset}>
-                  <legend>Select account role</legend>
-                  <div className={authStyles.roleOptions}>
-                    <label
-                      className={`${authStyles.roleCard} ${
-                        role === 'applicant' ? authStyles.roleCardSelected : ''
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="account-role"
-                        value="applicant"
-                        checked={role === 'applicant'}
-                        onChange={() => {
-                          setRole('applicant');
-                          setErrors({});
-                          setFeedback('');
-                        }}
-                        className={authStyles.roleRadio}
-                      />
-                      <span className={authStyles.roleIcon}>
-                        <UserRound size={18} />
-                      </span>
-                      <span className={authStyles.roleCopy}>
-                        <strong>Student / Applicant</strong>
-                        <small>Request &amp; book campus spaces</small>
-                      </span>
-                    </label>
-
-                    <label
-                      className={`${authStyles.roleCard} ${
-                        role === 'approver' ? authStyles.roleCardSelected : ''
-                      }`}
-                    >
-                      <input
-                        type="radio"
-                        name="account-role"
-                        value="approver"
-                        checked={role === 'approver'}
-                        onChange={() => {
-                          setRole('approver');
-                          setErrors({});
-                          setFeedback('');
-                        }}
-                        className={authStyles.roleRadio}
-                      />
-                      <span className={authStyles.roleIcon}>
-                        <ShieldCheck size={18} />
-                      </span>
-                      <span className={authStyles.roleCopy}>
-                        <strong>Faculty / Approver</strong>
-                        <small>Review &amp; approve requests</small>
-                      </span>
-                    </label>
-                  </div>
-                </fieldset>
-
-                {role === 'approver' && (
-                  <div
-                    style={{
-                      background: '#f8f5ff',
-                      border: '1px solid rgba(112, 71, 235, 0.22)',
-                      borderRadius: '10px',
-                      padding: '10px 14px',
-                      fontSize: '11.5px',
-                      color: '#5b21b6',
-                      lineHeight: '1.45',
-                    }}
-                  >
-                    <Clock size={14} style={{ verticalAlign: 'middle', marginRight: '6px' }} />
-                    <strong>Admin Verification:</strong> Faculty Approver accounts require administrator verification. Access is granted once verified.
-                  </div>
-                )}
+                <RoleSelector
+                  role={role}
+                  onChangeRole={(newRole) => {
+                    setRole(newRole);
+                    setErrors({});
+                    setFeedback('');
+                  }}
+                />
 
                 <div className={styles.nameFields}>
                   <div className={authStyles.field}>
@@ -677,62 +612,14 @@ export default function CreateAccount() {
           )}
 
           {step === 'pending_approval' && (
-            <div style={{ textAlign: 'center', padding: '20px 0' }}>
-              <div
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  width: '64px',
-                  height: '64px',
-                  borderRadius: '50%',
-                  background: '#f1edff',
-                  color: '#7047eb',
-                  marginBottom: '18px',
-                }}
-              >
-                <Clock size={32} />
-              </div>
-
-              <p className={authStyles.welcomeLabel}>REGISTRATION SUBMITTED</p>
-              <h2 style={{ fontSize: '24px', color: 'var(--color-text-primary)', marginBottom: '12px' }}>
-                Pending Administrator Approval
-              </h2>
-
-              <p style={{ fontSize: '13px', color: 'var(--color-text-secondary)', lineHeight: '1.6', marginBottom: '24px' }}>
-                Your email address (<strong>{form.email}</strong>) has been verified successfully.
-                Because you registered as an <strong>Approver</strong> for <strong>{departments.find(d => String(d.unit_id) === String(form.home_unit_id))?.unit_name || 'your department'}</strong>, your account must be verified by a campus administrator before sign-in is allowed.
-              </p>
-
-              <div
-                style={{
-                  background: '#f8fafc',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '10px',
-                  padding: '14px',
-                  fontSize: '12px',
-                  color: '#64748b',
-                  marginBottom: '28px',
-                  textAlign: 'left',
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px', color: '#0f172a', fontWeight: 600 }}>
-                  <CheckCircle2 size={16} color="#16a34a" /> Email Verified
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#b45309', fontWeight: 600 }}>
-                  <Clock size={16} color="#d97706" /> Administrator Sign-off Pending
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className={authStyles.submit}
-                onClick={() => navigate('/')}
-                style={{ width: '100%' }}
-              >
-                Return to Sign In
-              </button>
-            </div>
+            <PendingApprovalScreen
+              email={form.email}
+              departmentName={
+                departments.find((d) => String(d.unit_id) === String(form.home_unit_id))
+                  ?.unit_name || 'your department'
+              }
+              onReturnToSignIn={() => navigate('/')}
+            />
           )}
         </div>
       </section>

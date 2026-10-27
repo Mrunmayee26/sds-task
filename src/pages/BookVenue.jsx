@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle } from 'lucide-react';
+import { Clock } from 'lucide-react';
 import PortalLayout from '../layouts/PortalLayout';
 import { DataState, PageHeading } from '../components/BookingUI';
+import { AttendanceNotice, CapacityMeter } from '../components';
 import { useBookingData } from '../hooks/useBookingData';
 import { useAuth } from '../hooks/useAuth';
 import { checkAvailability, createBooking } from '../services/bookingService';
-import { campusTimestamp, dateKey } from '../services/format';
+import { campusTimestamp, dateKey, dateLabel, timeLabel } from '../services/format';
 
 export default function BookVenue() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
   const [query] = useSearchParams();
   const venues = useBookingData('venues');
@@ -19,10 +20,27 @@ export default function BookVenue() {
     description: '',
     application_type: 'Academic',
     expected_attendance: '',
-    date: '',
-    start_time: '',
-    end_time: '',
+    date: query.get('date') || '',
+    start_time: query.get('start_time') || query.get('start') || '',
+    end_time: query.get('end_time') || query.get('end') || '',
   });
+
+  useEffect(() => {
+    const qVenue = query.get('venue');
+    const qDate = query.get('date');
+    const qStart = query.get('start_time') || query.get('start');
+    const qEnd = query.get('end_time') || query.get('end');
+
+    if (qVenue || qDate || qStart || qEnd) {
+      setForm((prev) => ({
+        ...prev,
+        ...(qVenue ? { venue_id: qVenue } : {}),
+        ...(qDate ? { date: qDate } : {}),
+        ...(qStart ? { start_time: qStart } : {}),
+        ...(qEnd ? { end_time: qEnd } : {}),
+      }));
+    }
+  }, [query]);
   const [availability, setAvailability] = useState(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -137,7 +155,7 @@ export default function BookVenue() {
         start_time: campusTimestamp(date, start_time),
         end_time: campusTimestamp(date, end_time),
       });
-      navigate(`/applicant/bookings/${saved.application_id}`, {
+      navigate(`/${session?.role || user?.role || 'applicant'}/bookings/${saved.application_id}`, {
         state: { message: 'Your booking request has been submitted.' },
       });
     } catch (failure) {
@@ -169,6 +187,31 @@ export default function BookVenue() {
                 <h2>Booking details</h2>
                 <span className="muted">All times in IST</span>
               </div>
+              {date && start_time && end_time && (
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, #f5f2ff 0%, #ede7ff 100%)',
+                    border: '1px solid #d4c4fb',
+                    borderRadius: '10px',
+                    padding: '12px 16px',
+                    marginBottom: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '13px',
+                    color: '#5329b3',
+                  }}
+                >
+                  <Clock size={18} style={{ color: '#7047eb', flexShrink: 0 }} />
+                  <span>
+                    Selected Time Slot:{' '}
+                    <strong>{dateLabel(date)}</strong> from{' '}
+                    <strong>{timeLabel(campusTimestamp(date, start_time))}</strong> to{' '}
+                    <strong>{timeLabel(campusTimestamp(date, end_time))}</strong>.
+                    {!venue_id && ' Select a venue below to check availability.'}
+                  </span>
+                </div>
+              )}
               <label>
                 Venue
                 <select
@@ -259,83 +302,18 @@ export default function BookVenue() {
                   />
                 </label>
               </div>
-              {exceedsCapacity && (
-                <div
-                  className="notice error"
-                  style={{
-                    margin: '0',
-                    display: 'grid',
-                    gap: 10,
-                    borderRadius: 10,
-                  }}
-                  role="alert"
-                >
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-                    <AlertTriangle
-                      size={18}
-                      style={{ flexShrink: 0, marginTop: 2 }}
-                    />
-                    <div>
-                      <strong>Capacity Exceeded:</strong> You entered{' '}
-                      {attendance} attendees, but {selected.venue_name} only
-                      accommodates up to {selected.capacity} seats (
-                      {attendance - selected.capacity} seats over capacity).
-                    </div>
-                  </div>
-                  {suggestedVenues.length > 0 ? (
-                    <div
-                      style={{
-                        borderTop: '1px solid #ffd4dc',
-                        paddingTop: 8,
-                        fontSize: 11,
-                      }}
-                    >
-                      <p style={{ margin: '0 0 6px', fontWeight: 600 }}>
-                        Suggested venues that fit your attendance:
-                      </p>
-                      <div
-                        style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}
-                      >
-                        {suggestedVenues.slice(0, 3).map((v) => (
-                          <button
-                            key={v.venue_id}
-                            type="button"
-                            className="button secondary"
-                            style={{
-                              minHeight: 32,
-                              padding: '5px 12px',
-                              fontSize: 11,
-                              background: '#fff',
-                            }}
-                            onClick={() => {
-                              setForm((prev) => ({
-                                ...prev,
-                                venue_id: String(v.venue_id),
-                              }));
-                              setError('');
-                            }}
-                          >
-                            Switch to {v.venue_name} ({v.capacity} seats)
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <p style={{ margin: 0, fontSize: 11 }}>
-                      Please reduce the expected attendance to reserve this space.
-                    </p>
-                  )}
-                </div>
-              )}
-              {nearCapacity && (
-                <p
-                  className="notice warning"
-                  style={{ margin: 0, padding: '10px 14px', fontSize: 11 }}
-                >
-                  ℹ️ Note: This booking utilizes {fillPercentage}% of{' '}
-                  {selected.venue_name}'s capacity ({selected.capacity} seats).
-                </p>
-              )}
+              <AttendanceNotice
+                selected={selected}
+                attendance={attendance}
+                exceedsCapacity={exceedsCapacity}
+                nearCapacity={nearCapacity}
+                fillPercentage={fillPercentage}
+                suggestedVenues={suggestedVenues}
+                onSelectVenue={(vId) => {
+                  setForm((prev) => ({ ...prev, venue_id: vId }));
+                  setError('');
+                }}
+              />
               <label>
                 Event description
                 <textarea
@@ -430,75 +408,13 @@ export default function BookVenue() {
                       ? `${selected.capacity} seats capacity`
                       : 'Capacity not specified'}
                   </p>
-                  {attendance > 0 && selected.capacity && (
-                    <div style={{ margin: '10px 0' }}>
-                      <div
-                        style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          fontSize: 11,
-                          marginBottom: 6,
-                        }}
-                      >
-                        <span>Capacity utilization</span>
-                        <strong
-                          style={{
-                            color: exceedsCapacity
-                              ? '#b02c48'
-                              : nearCapacity
-                                ? '#a96d0e'
-                                : '#22815d',
-                          }}
-                        >
-                          {attendance} / {selected.capacity} ({fillPercentage}%)
-                        </strong>
-                      </div>
-                      <div
-                        style={{
-                          background: '#eee8f5',
-                          borderRadius: 6,
-                          height: 7,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: `${Math.min(100, (attendance / selected.capacity) * 100)}%`,
-                            height: '100%',
-                            background: exceedsCapacity
-                              ? '#ff4d5b'
-                              : nearCapacity
-                                ? '#f2c080'
-                                : '#80c8a7',
-                            borderRadius: 6,
-                            transition: 'width 0.2s',
-                          }}
-                        />
-                      </div>
-                      {exceedsCapacity ? (
-                        <small
-                          style={{
-                            color: '#b02c48',
-                            display: 'block',
-                            marginTop: 5,
-                            fontWeight: 600,
-                          }}
-                        >
-                          Exceeds by {attendance - selected.capacity} seats
-                        </small>
-                      ) : nearCapacity ? (
-                        <small
-                          style={{
-                            color: '#a96d0e',
-                            display: 'block',
-                            marginTop: 5,
-                          }}
-                        >
-                          Near venue capacity
-                        </small>
-                      ) : null}
-                    </div>
-                  )}
+                  <CapacityMeter
+                    selected={selected}
+                    attendance={attendance}
+                    exceedsCapacity={exceedsCapacity}
+                    nearCapacity={nearCapacity}
+                    fillPercentage={fillPercentage}
+                  />
                   <hr />
                   <p className="eyebrow">REVIEWED BY</p>
                   <p>{selected.primary_approval_group}</p>
