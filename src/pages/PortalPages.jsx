@@ -3,7 +3,11 @@ import { Link } from 'react-router-dom';
 import {
   ArrowRight,
   Building2,
+  Calendar,
   CalendarPlus,
+  ChevronLeft,
+  ChevronRight,
+  List,
   MapPin,
   Users,
 } from 'lucide-react';
@@ -11,7 +15,8 @@ import PortalLayout from '../layouts/PortalLayout';
 import { useAuth } from '../hooks/useAuth';
 import { useBookingData } from '../hooks/useBookingData';
 import { BookingTable, DataState, PageHeading } from '../components/BookingUI';
-import { dateKey } from '../services/format';
+import { CAMPUS_TIMEZONE, dateKey } from '../services/format';
+import { WeeklyCalendar, ProfileEditor } from '../components';
 
 export function Dashboard() {
   const { session, user } = useAuth();
@@ -257,15 +262,68 @@ export function Bookings() {
   );
 }
 
+
+function getMonday(d) {
+  const date = new Date(d);
+  const day = date.getDay();
+  const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+  date.setDate(diff);
+  date.setHours(0, 0, 0, 0);
+  return date;
+}
+
 export function Schedule() {
   const { session } = useAuth();
   const result = useBookingData(
     'bookings',
     session.role === 'approver' ? 'review' : 'mine',
   );
+  const [viewMode, setViewMode] = useState('calendar');
   const [date, setDate] = useState(dateKey());
   const [status, setStatus] = useState('approved');
-  const bookings = result.data
+  const [weekStart, setWeekStart] = useState(() => getMonday(new Date()));
+
+  const handlePrevWeek = () => {
+    setWeekStart((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() - 7);
+      return next;
+    });
+  };
+
+  const handleNextWeek = () => {
+    setWeekStart((prev) => {
+      const next = new Date(prev);
+      next.setDate(next.getDate() + 7);
+      return next;
+    });
+  };
+
+  const handleCurrentWeek = () => {
+    setWeekStart(getMonday(new Date()));
+  };
+
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(weekStart);
+    d.setDate(weekStart.getDate() + i);
+    return d;
+  });
+
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  const weekRangeLabel = `${new Intl.DateTimeFormat('en-IN', {
+    timeZone: CAMPUS_TIMEZONE,
+    day: 'numeric',
+    month: 'short',
+  }).format(weekStart)} – ${new Intl.DateTimeFormat('en-IN', {
+    timeZone: CAMPUS_TIMEZONE,
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(weekEnd)}`;
+
+  const listBookings = result.data
     .filter(
       (row) =>
         row.start_time &&
@@ -273,41 +331,215 @@ export function Schedule() {
         (!status || row.status === status),
     )
     .sort((a, b) => new Date(a.start_time) - new Date(b.start_time));
+
+  const totalWeekEvents = weekDays.reduce((total, dayDate) => {
+    const dayKey = dateKey(dayDate);
+    return (
+      total +
+      result.data.filter(
+        (row) =>
+          row.start_time &&
+          dateKey(row.start_time) === dayKey &&
+          (!status || row.status === status),
+      ).length
+    );
+  }, 0);
+
   return (
     <PortalLayout>
-      <PageHeading title="Campus schedule.">
+      <PageHeading
+        title="Campus schedule."
+        action={
+          <div className="schedule-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'calendar'}
+              className={`schedule-tab ${viewMode === 'calendar' ? 'active' : ''}`}
+              onClick={() => setViewMode('calendar')}
+            >
+              <Calendar size={15} />
+              Weekly Calendar
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={viewMode === 'list'}
+              className={`schedule-tab ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+            >
+              <List size={15} />
+              Daily List
+            </button>
+          </div>
+        }
+      >
         Plan around your bookings. All times are in India Standard Time.
       </PageHeading>
-      <div className="filter-bar">
-        <label>
-          Date
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </label>
-        <label>
-          Status
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="approved">Approved</option>
-            <option value="submitted">Pending</option>
-            <option value="">All statuses</option>
-          </select>
-        </label>
-        <button className="button secondary" onClick={() => setDate('')}>
-          Show all dates
-        </button>
-      </div>
-      <DataState {...result} />
-      {!result.loading && !result.error && (
-        <section className="panel">
-          <BookingTable
-            bookings={bookings}
-            role={session.role}
-            empty="No bookings for this selection."
-          />
-        </section>
+
+      {viewMode === 'calendar' ? (
+        <>
+          <div className="calendar-nav-bar">
+            <div className="calendar-nav-controls">
+              <button
+                type="button"
+                className="cal-nav-btn"
+                onClick={handlePrevWeek}
+                title="Previous week"
+                aria-label="Previous week"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                type="button"
+                className="button secondary"
+                style={{ minHeight: 34, padding: '6px 14px', fontSize: 12 }}
+                onClick={handleCurrentWeek}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className="cal-nav-btn"
+                onClick={handleNextWeek}
+                title="Next week"
+                aria-label="Next week"
+              >
+                <ChevronRight size={18} />
+              </button>
+              <span className="calendar-range-title">{weekRangeLabel}</span>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 14,
+                flexWrap: 'wrap',
+              }}
+            >
+              <label
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  margin: 0,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 600,
+                    color: '#675c76',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  Status
+                </span>
+                <select
+                  value={status}
+                  onChange={(e) => setStatus(e.target.value)}
+                  style={{ minHeight: 36, padding: '6px 12px' }}
+                >
+                  <option value="approved">Approved</option>
+                  <option value="submitted">Pending</option>
+                  <option value="">All statuses</option>
+                </select>
+              </label>
+
+              <button
+                className="button secondary"
+                style={{ minHeight: 36, padding: '6px 14px', fontSize: 12 }}
+                onClick={result.refresh}
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              margin: '0 0 14px',
+              fontSize: 12,
+              color: '#7a708a',
+              flexWrap: 'wrap',
+              gap: 8,
+            }}
+          >
+            <span>
+              Showing <strong>{totalWeekEvents}</strong>{' '}
+              {status ? status : 'scheduled'}{' '}
+              {totalWeekEvents === 1 ? 'event' : 'events'} this week
+            </span>
+            <span className="muted" style={{ fontSize: 11 }}>
+              Tip: Click any time slot to book a venue, or click a day header for daily list
+            </span>
+          </div>
+
+          <DataState {...result} />
+
+          {!result.loading && !result.error && (
+            <WeeklyCalendar
+              bookings={result.data}
+              weekStart={weekStart}
+              status={status}
+              role={session.role}
+              onSelectDate={(selectedDate) => {
+                setDate(selectedDate);
+                setViewMode('list');
+              }}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          <div className="filter-bar">
+            <label>
+              Date
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </label>
+            <label>
+              Status
+              <select
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              >
+                <option value="approved">Approved</option>
+                <option value="submitted">Pending</option>
+                <option value="">All statuses</option>
+              </select>
+            </label>
+            <button
+              className="button secondary"
+              onClick={() => setDate('')}
+            >
+              Show all dates
+            </button>
+            <button
+              className="button secondary"
+              onClick={result.refresh}
+            >
+              Refresh
+            </button>
+          </div>
+          <DataState {...result} />
+          {!result.loading && !result.error && (
+            <section className="panel">
+              <BookingTable
+                bookings={listBookings}
+                role={session.role}
+                empty="No bookings for this selection."
+              />
+            </section>
+          )}
+        </>
       )}
     </PortalLayout>
   );
@@ -320,48 +552,7 @@ export function Profile() {
       <PageHeading title="Your profile.">
         Your registered campus account and review permissions.
       </PageHeading>
-      <section className="panel profile-panel">
-        <span className="profile-initial">{user.full_name[0]}</span>
-        <h2>{user.full_name}</h2>
-        <dl className="detail-grid">
-          <div>
-            <dt>Email</dt>
-            <dd>{user.email}</dd>
-          </div>
-          <div>
-            <dt>Account type</dt>
-            <dd>{user.user_type}</dd>
-          </div>
-          <div>
-            <dt>Department</dt>
-            <dd>{user.unit_name || 'Not assigned'}</dd>
-          </div>
-          <div>
-            <dt>Account status</dt>
-            <dd>{user.is_active ? 'Active' : 'Inactive'}</dd>
-          </div>
-        </dl>
-        <h3>Approval groups</h3>
-        {user.approval_groups.length ? (
-          <ul className="group-list">
-            {user.approval_groups.map((group) => (
-              <li key={group.access_id}>
-                <strong>{group.group_name}</strong>
-                <span>
-                  {group.member_role} ·{' '}
-                  {group.can_approve ? 'Can review' : 'Member'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">No approval groups assigned.</p>
-        )}
-        <p className="muted">
-          Contact the campus administrator to update account details or review
-          permissions.
-        </p>
-      </section>
+      <ProfileEditor user={user} />
     </PortalLayout>
   );
 }

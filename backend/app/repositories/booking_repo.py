@@ -15,7 +15,7 @@ MEMBER_CHECK = """
 
 def read_booking(cur, booking_id):
     cur.execute("""
-        SELECT a.*, v.venue_name, u.full_name AS applicant_name
+        SELECT a.*, v.venue_name, u.full_name AS applicant_name, u.email AS applicant_email
         FROM applications a JOIN venues v ON v.venue_id = a.venue_id
         JOIN users u ON u.user_id = a.applicant_user_id
         WHERE a.application_id = %s
@@ -60,7 +60,7 @@ def list_bookings(user_id, scope, status, limit, offset):
         if scope == "review":
             condition = "EXISTS (SELECT 1 FROM application_approvals aa WHERE aa.application_id = a.application_id AND EXISTS (" + MEMBER_CHECK + "))"
         cur.execute("""
-            SELECT a.*, v.venue_name, u.full_name AS applicant_name,
+            SELECT a.*, v.venue_name, u.full_name AS applicant_name, u.email AS applicant_email,
                 (SELECT MIN(start_time) FROM booking_slots s WHERE s.application_id = a.application_id) AS start_time,
                 (SELECT MAX(end_time) FROM booking_slots s WHERE s.application_id = a.application_id) AS end_time
             FROM applications a JOIN venues v ON v.venue_id = a.venue_id

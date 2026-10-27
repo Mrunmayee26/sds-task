@@ -67,7 +67,10 @@ export async function requestRegistrationOtp(form) {
         lastName: form.lastName,
         email: form.email,
         password: form.password,
-        role: 'applicant',
+        role: form.role || 'applicant',
+        home_unit_id: form.home_unit_id ? Number(form.home_unit_id) : null,
+        designation: form.designation || null,
+        identifier: form.identifier || null,
       },
     });
     return { ok: true, ...data };
@@ -82,8 +85,18 @@ export async function verifyRegistrationOtp(email, otp) {
       method: 'POST',
       body: { email, otp },
     });
-    saveSession(data.user, data.access_token);
-    return { ok: true, user: { ...data.user, role: 'applicant' } };
+
+    if (data.status === 'pending_admin_approval' || !data.access_token) {
+      return {
+        ok: true,
+        pendingApproval: true,
+        message: data.message || 'Your account is pending administrator verification.',
+      };
+    }
+
+    const role = data.user?.user_type || 'applicant';
+    saveSession(data.user, data.access_token, role);
+    return { ok: true, user: { ...data.user, role } };
   } catch (error) {
     return { ok: false, message: error.message };
   }
@@ -102,3 +115,33 @@ export async function resendRegistrationOtp(email) {
     return { ok: false, message: error.message };
   }
 }
+
+export async function fetchDepartments() {
+  try {
+    return await apiRequest('api/v1/auth/departments');
+  } catch {
+    return [];
+  }
+}
+
+export async function updateProfile(data) {
+  try {
+    const updatedUser = await apiRequest('api/v1/auth/profile', {
+      method: 'PUT',
+      body: data,
+    });
+    const session = getSession();
+    const token = sessionStorage.getItem(TOKEN_KEY);
+    if (session && token) {
+      saveSession(
+        updatedUser,
+        token,
+        session.role || updatedUser.user_type || 'applicant',
+      );
+    }
+    return { ok: true, user: updatedUser };
+  } catch (error) {
+    return { ok: false, message: error.message };
+  }
+}
+

@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Clock } from 'lucide-react';
 import PortalLayout from '../layouts/PortalLayout';
 import { DataState, PageHeading } from '../components/BookingUI';
+import { AttendanceNotice, CapacityMeter } from '../components';
 import { useBookingData } from '../hooks/useBookingData';
 import { useAuth } from '../hooks/useAuth';
 import { checkAvailability, createBooking } from '../services/bookingService';
-import { campusTimestamp, dateKey } from '../services/format';
+import { campusTimestamp, dateKey, dateLabel, timeLabel } from '../services/format';
 
 export default function BookVenue() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
   const navigate = useNavigate();
   const [query] = useSearchParams();
   const venues = useBookingData('venues');
@@ -18,10 +20,27 @@ export default function BookVenue() {
     description: '',
     application_type: 'Academic',
     expected_attendance: '',
-    date: '',
-    start_time: '',
-    end_time: '',
+    date: query.get('date') || '',
+    start_time: query.get('start_time') || query.get('start') || '',
+    end_time: query.get('end_time') || query.get('end') || '',
   });
+
+  useEffect(() => {
+    const qVenue = query.get('venue');
+    const qDate = query.get('date');
+    const qStart = query.get('start_time') || query.get('start');
+    const qEnd = query.get('end_time') || query.get('end');
+
+    if (qVenue || qDate || qStart || qEnd) {
+      setForm((prev) => ({
+        ...prev,
+        ...(qVenue ? { venue_id: qVenue } : {}),
+        ...(qDate ? { date: qDate } : {}),
+        ...(qStart ? { start_time: qStart } : {}),
+        ...(qEnd ? { end_time: qEnd } : {}),
+      }));
+    }
+  }, [query]);
   const [availability, setAvailability] = useState(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -29,6 +48,31 @@ export default function BookVenue() {
   const selected = venues.data.find(
     (venue) => venue.venue_id === Number(form.venue_id),
   );
+  const attendance = form.expected_attendance
+    ? Number(form.expected_attendance)
+    : 0;
+  const exceedsCapacity = Boolean(
+    selected?.capacity && attendance > selected.capacity,
+  );
+  const nearCapacity = Boolean(
+    selected?.capacity &&
+      attendance > selected.capacity * 0.85 &&
+      !exceedsCapacity,
+  );
+  const fillPercentage =
+    selected?.capacity && attendance
+      ? Math.min(100, Math.round((attendance / selected.capacity) * 100))
+      : 0;
+  const suggestedVenues = exceedsCapacity
+    ? venues.data.filter(
+        (v) =>
+          v.venue_id !== selected?.venue_id &&
+          v.is_active !== false &&
+          v.capacity &&
+          v.capacity >= attendance,
+      )
+    : [];
+
   const update = (event) => {
     setForm((previous) => ({
       ...previous,
@@ -80,6 +124,16 @@ export default function BookVenue() {
       setError('Choose an active venue.');
       return;
     }
+    if (selected.capacity && Number(form.expected_attendance) > selected.capacity) {
+      setError(
+        `Expected attendance (${form.expected_attendance}) exceeds the maximum capacity of ${selected.venue_name} (${selected.capacity} seats). Please reduce attendance or select a larger venue.`,
+      );
+      return;
+    }
+    if (Number(form.expected_attendance) <= 0) {
+      setError('Expected attendance must be at least 1 person.');
+      return;
+    }
     if (end_time <= start_time) {
       setError('End time must be after start time.');
       return;
@@ -101,7 +155,7 @@ export default function BookVenue() {
         start_time: campusTimestamp(date, start_time),
         end_time: campusTimestamp(date, end_time),
       });
-      navigate(`/applicant/bookings/${saved.application_id}`, {
+      navigate(`/${session?.role || user?.role || 'applicant'}/bookings/${saved.application_id}`, {
         state: { message: 'Your booking request has been submitted.' },
       });
     } catch (failure) {
@@ -133,6 +187,31 @@ export default function BookVenue() {
                 <h2>Booking details</h2>
                 <span className="muted">All times in IST</span>
               </div>
+              {date && start_time && end_time && (
+                <div
+                  style={{
+                    background: 'linear-gradient(135deg, #f5f2ff 0%, #ede7ff 100%)',
+                    border: '1px solid #d4c4fb',
+                    borderRadius: '10px',
+                    padding: '12px 16px',
+                    marginBottom: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '13px',
+                    color: '#5329b3',
+                  }}
+                >
+                  <Clock size={18} style={{ color: '#7047eb', flexShrink: 0 }} />
+                  <span>
+                    Selected Time Slot:{' '}
+                    <strong>{dateLabel(date)}</strong> from{' '}
+                    <strong>{timeLabel(campusTimestamp(date, start_time))}</strong> to{' '}
+                    <strong>{timeLabel(campusTimestamp(date, end_time))}</strong>.
+                    {!venue_id && ' Select a venue below to check availability.'}
+                  </span>
+                </div>
+              )}
               <label>
                 Venue
                 <select
@@ -182,19 +261,59 @@ export default function BookVenue() {
                   </select>
                 </label>
                 <label>
-                  Expected attendance
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'baseline',
+                    }}
+                  >
+                    <span>Expected attendance</span>
+                    {selected?.capacity && (
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          color: exceedsCapacity ? '#b02c48' : '#7047eb',
+                        }}
+                      >
+                        Max: {selected.capacity} seats
+                      </span>
+                    )}
+                  </div>
                   <input
                     type="number"
                     name="expected_attendance"
                     value={form.expected_attendance}
                     onChange={update}
                     min="1"
-                    max={selected?.capacity || undefined}
                     step="1"
                     required
+                    placeholder={
+                      selected?.capacity
+                        ? `Up to ${selected.capacity} attendees`
+                        : 'Number of attendees'
+                    }
+                    style={
+                      exceedsCapacity
+                        ? { borderColor: '#ff4d5b', backgroundColor: '#fff8f9' }
+                        : {}
+                    }
                   />
                 </label>
               </div>
+              <AttendanceNotice
+                selected={selected}
+                attendance={attendance}
+                exceedsCapacity={exceedsCapacity}
+                nearCapacity={nearCapacity}
+                fillPercentage={fillPercentage}
+                suggestedVenues={suggestedVenues}
+                onSelectVenue={(vId) => {
+                  setForm((prev) => ({ ...prev, venue_id: vId }));
+                  setError('');
+                }}
+              />
               <label>
                 Event description
                 <textarea
@@ -263,10 +382,16 @@ export default function BookVenue() {
                   className="button primary"
                   type="submit"
                   disabled={
-                    submitting || currentAvailability?.available === false
+                    submitting ||
+                    currentAvailability?.available === false ||
+                    exceedsCapacity
                   }
                 >
-                  {submitting ? 'Submitting…' : 'Submit request'}
+                  {submitting
+                    ? 'Submitting…'
+                    : exceedsCapacity
+                      ? 'Exceeds venue capacity'
+                      : 'Submit request'}
                 </button>
               </div>
             </form>
@@ -280,9 +405,16 @@ export default function BookVenue() {
                 <>
                   <p>
                     {selected.capacity
-                      ? `${selected.capacity} seats`
+                      ? `${selected.capacity} seats capacity`
                       : 'Capacity not specified'}
                   </p>
+                  <CapacityMeter
+                    selected={selected}
+                    attendance={attendance}
+                    exceedsCapacity={exceedsCapacity}
+                    nearCapacity={nearCapacity}
+                    fillPercentage={fillPercentage}
+                  />
                   <hr />
                   <p className="eyebrow">REVIEWED BY</p>
                   <p>{selected.primary_approval_group}</p>

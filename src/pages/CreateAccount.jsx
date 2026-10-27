@@ -10,13 +10,18 @@ import {
   ShieldCheck,
   ArrowLeft,
   RotateCw,
+  Building2,
+  Briefcase,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
-import { AuthBrandPanel } from '../components';
+import { AuthBrandPanel, RoleSelector, PendingApprovalScreen } from '../components';
 import {
   dashboardForRole,
   requestRegistrationOtp,
   verifyRegistrationOtp,
   resendRegistrationOtp,
+  fetchDepartments,
 } from '../services/auth.js';
 import { useAuth } from '../hooks/useAuth';
 import authStyles from './Login.module.css';
@@ -24,7 +29,21 @@ import styles from './CreateAccount.module.css';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const validateForm = (form) => {
+const FALLBACK_DEPARTMENTS = [
+  { unit_id: 1, unit_name: "Registrar's Office" },
+  { unit_id: 2, unit_name: 'Bhau Institute of Innovation, Entrepreneurship and Leadership' },
+  { unit_id: 3, unit_name: 'Department of Computer Engineering' },
+  { unit_id: 4, unit_name: 'Department of Mechanical Engineering' },
+  { unit_id: 5, unit_name: 'Department of Civil Engineering' },
+  { unit_id: 6, unit_name: 'Department of Electrical Engineering' },
+  { unit_id: 7, unit_name: 'Department of Electronics and Telecommunication' },
+  { unit_id: 8, unit_name: 'Department of Instrumentation and Control' },
+  { unit_id: 9, unit_name: 'Department of Metallurgy and Material Engineering' },
+  { unit_id: 10, unit_name: 'Department of Manufacturing Engineering' },
+  { unit_id: 11, unit_name: 'Gymkhana and Sports Office' },
+];
+
+const validateForm = (form, role) => {
   const errors = {};
   if (!form.firstName.trim()) errors.firstName = 'Enter your first name.';
   if (!form.lastName.trim()) errors.lastName = 'Enter your last name.';
@@ -37,19 +56,31 @@ const validateForm = (form) => {
   if (!form.confirmPassword) errors.confirmPassword = 'Confirm your password.';
   else if (form.confirmPassword !== form.password)
     errors.confirmPassword = 'Passwords do not match.';
+
+  if (role === 'approver') {
+    if (!form.home_unit_id) errors.home_unit_id = 'Please select your department.';
+    if (!form.designation?.trim()) errors.designation = 'Please enter your role or title.';
+  }
+
   return errors;
 };
 
 export default function CreateAccount() {
   const navigate = useNavigate();
   const { session } = useAuth();
+  const [role, setRole] = useState('applicant');
+  const [departments, setDepartments] = useState(FALLBACK_DEPARTMENTS);
+
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
+    home_unit_id: '',
+    designation: '',
   });
+
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState({});
@@ -57,10 +88,21 @@ export default function CreateAccount() {
   const [successMsg, setSuccessMsg] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // OTP Verification States
-  const [step, setStep] = useState('form'); // 'form' | 'otp'
+  // States: 'form' | 'otp' | 'pending_approval'
+  const [step, setStep] = useState('form');
   const [otp, setOtp] = useState('');
   const [resendCooldown, setResendCooldown] = useState(0);
+
+  // Fetch departments on mount for approver selector
+  useEffect(() => {
+    let mounted = true;
+    fetchDepartments().then((list) => {
+      if (mounted && list && list.length > 0) {
+        setDepartments(list);
+      }
+    });
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     let timer;
@@ -82,13 +124,13 @@ export default function CreateAccount() {
     event.preventDefault();
     setFeedback('');
     setSuccessMsg('');
-    const nextErrors = validateForm(form);
+    const nextErrors = validateForm(form, role);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
     setIsSubmitting(true);
     try {
-      const result = await requestRegistrationOtp(form);
+      const result = await requestRegistrationOtp({ ...form, role });
       if (!result.ok) {
         setFeedback(result.message || 'Registration could not be initiated.');
       } else {
@@ -121,7 +163,11 @@ export default function CreateAccount() {
       const result = await verifyRegistrationOtp(form.email, otp.trim());
       if (!result.ok) {
         setFeedback(result.message || 'Invalid or expired verification code.');
+      } else if (result.pendingApproval) {
+        // Approver account created, waiting for admin activation
+        setStep('pending_approval');
       } else {
+        // Applicant account auto-activated
         navigate(dashboardForRole(result.user?.role || 'applicant'), {
           replace: true,
         });
@@ -174,12 +220,12 @@ export default function CreateAccount() {
         aria-labelledby="create-account-title"
       >
         <div className={`${authStyles.formContent} ${styles.formContent}`}>
-          {step === 'form' ? (
+          {step === 'form' && (
             <>
               <p className={authStyles.welcomeLabel}>CREATE YOUR ACCOUNT</p>
               <h2 id="create-account-title">Join your campus workspace</h2>
               <p className={authStyles.formSubtitle}>
-                Register with your official college email address.
+                Register with your official college credentials.
               </p>
 
               <form
@@ -187,6 +233,16 @@ export default function CreateAccount() {
                 onSubmit={handleRequestOtp}
                 noValidate
               >
+                {/* Role Switcher */}
+                <RoleSelector
+                  role={role}
+                  onChangeRole={(newRole) => {
+                    setRole(newRole);
+                    setErrors({});
+                    setFeedback('');
+                  }}
+                />
+
                 <div className={styles.nameFields}>
                   <div className={authStyles.field}>
                     <label htmlFor="register-first-name">First name</label>
@@ -211,6 +267,7 @@ export default function CreateAccount() {
                     </div>
                     {fieldError('firstName')}
                   </div>
+
                   <div className={authStyles.field}>
                     <label htmlFor="register-last-name">Last name</label>
                     <div className={authStyles.inputWrap}>
@@ -259,6 +316,55 @@ export default function CreateAccount() {
                   {fieldError('email')}
                 </div>
 
+                {role === 'approver' && (
+                  <>
+                    <div className={authStyles.field}>
+                      <label htmlFor="register-department">Department / Academic Unit</label>
+                      <div className={authStyles.inputWrap}>
+                        <Building2 size={17} aria-hidden="true" />
+                        <select
+                          id="register-department"
+                          name="home_unit_id"
+                          value={form.home_unit_id}
+                          onChange={(e) => updateField('home_unit_id', e.target.value)}
+                          style={{
+                            width: '100%',
+                            border: 'none',
+                            outline: 'none',
+                            background: 'transparent',
+                            fontSize: '13px',
+                            color: form.home_unit_id ? 'var(--color-text-primary)' : '#aaa7b7',
+                          }}
+                        >
+                          <option value="">Select your department...</option>
+                          {departments.map((dept) => (
+                            <option key={dept.unit_id} value={dept.unit_id}>
+                              {dept.unit_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      {fieldError('home_unit_id')}
+                    </div>
+
+                    <div className={authStyles.field}>
+                      <label htmlFor="register-designation">Designation / Role Title</label>
+                      <div className={authStyles.inputWrap}>
+                        <Briefcase size={17} aria-hidden="true" />
+                        <input
+                          id="register-designation"
+                          name="designation"
+                          placeholder="e.g. Professor &amp; HOD, Dean, Faculty In-charge"
+                          value={form.designation}
+                          onChange={(e) => updateField('designation', e.target.value)}
+                          aria-invalid={Boolean(errors.designation)}
+                        />
+                      </div>
+                      {fieldError('designation')}
+                    </div>
+                  </>
+                )}
+
                 <div className={styles.passwordFields}>
                   <div className={authStyles.field}>
                     <label htmlFor="register-password">Password</label>
@@ -299,6 +405,7 @@ export default function CreateAccount() {
                     </div>
                     {fieldError('password')}
                   </div>
+
                   <div className={authStyles.field}>
                     <label htmlFor="register-confirm-password">
                       Confirm password
@@ -346,16 +453,12 @@ export default function CreateAccount() {
                   </div>
                 </div>
 
-                <p className={styles.roleNotice}>
-                  New accounts can request venues. Review permissions are
-                  assigned by the campus administrator.
-                </p>
-
                 {feedback && (
                   <p className={authStyles.error} role="alert">
                     {feedback}
                   </p>
                 )}
+
                 <button
                   className={authStyles.submit}
                   type="submit"
@@ -377,7 +480,9 @@ export default function CreateAccount() {
                 </Link>
               </p>
             </>
-          ) : (
+          )}
+
+          {step === 'otp' && (
             <>
               <button
                 type="button"
@@ -504,6 +609,17 @@ export default function CreateAccount() {
                 </div>
               </form>
             </>
+          )}
+
+          {step === 'pending_approval' && (
+            <PendingApprovalScreen
+              email={form.email}
+              departmentName={
+                departments.find((d) => String(d.unit_id) === String(form.home_unit_id))
+                  ?.unit_name || 'your department'
+              }
+              onReturnToSignIn={() => navigate('/')}
+            />
           )}
         </div>
       </section>
