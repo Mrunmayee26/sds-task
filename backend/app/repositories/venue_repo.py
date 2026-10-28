@@ -51,3 +51,29 @@ def has_conflict(cur, venue_id, start_time, end_time, exclude_id=0):
         LIMIT 1
     """, (venue_id, end_time, start_time, exclude_id))
     return cur.fetchone() is not None
+
+
+def has_confirmed_conflict(cur, venue_id, start_time, end_time, exclude_id=0):
+    cur.execute("""
+        SELECT 1 FROM booking_slots
+        WHERE venue_id = %s AND slot_status = 'confirmed'
+          AND start_time < %s AND end_time > %s AND application_id <> %s
+        LIMIT 1
+    """, (venue_id, end_time, start_time, exclude_id))
+    return cur.fetchone() is not None
+
+
+def get_conflicting_booking(cur, venue_id, start_time, end_time, exclude_id=0):
+    cur.execute("""
+        SELECT s.application_id, s.slot_status, a.purpose, a.status AS application_status,
+               u.full_name AS applicant_name
+        FROM booking_slots s
+        JOIN applications a ON a.application_id = s.application_id
+        LEFT JOIN users u ON u.user_id = a.applicant_user_id
+        WHERE s.venue_id = %s AND s.slot_status IN ('pending', 'confirmed')
+          AND s.start_time < %s AND s.end_time > %s AND s.application_id <> %s
+        ORDER BY CASE WHEN s.slot_status = 'confirmed' THEN 1 ELSE 2 END, s.slot_id
+        LIMIT 1
+    """, (venue_id, end_time, start_time, exclude_id))
+    return cur.fetchone()
+

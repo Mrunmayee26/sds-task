@@ -304,6 +304,11 @@
   color: #82768e;
   background: #f0edf4;
 }
+.status-needs_reassignment {
+  color: #b74c0e;
+  background: #fff0e6;
+  border: 1px solid #fed7aa;
+}
 .filter-bar {
   display: flex;
   align-items: flex-end;

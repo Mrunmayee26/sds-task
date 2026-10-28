@@ -46,8 +46,9 @@ CREATE TABLE applications (
     application_type VARCHAR(40) NOT NULL, purpose VARCHAR(255) NOT NULL,
     description TEXT,
     status VARCHAR(30) NOT NULL DEFAULT 'draft'
-        CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), submitted_at TIMESTAMPTZ
+        CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled', 'needs_reassignment')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), submitted_at TIMESTAMPTZ,
+    faculty_advisor_id INTEGER REFERENCES users(user_id)
 );
 CREATE TABLE booking_slots (
     slot_id SERIAL PRIMARY KEY, application_id INTEGER NOT NULL REFERENCES applications,

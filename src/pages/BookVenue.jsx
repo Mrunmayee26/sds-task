@@ -6,6 +6,7 @@ import { DataState, PageHeading } from '../components/BookingUI';
 import { AttendanceNotice, CapacityMeter } from '../components';
 import { useBookingData } from '../hooks/useBookingData';
 import { useAuth } from '../hooks/useAuth';
+import { fetchFacultyAdvisors } from '../services/auth';
 import { checkAvailability, createBooking } from '../services/bookingService';
 import { campusTimestamp, dateKey, dateLabel, timeLabel } from '../services/format';
 
@@ -14,8 +15,10 @@ export default function BookVenue() {
   const navigate = useNavigate();
   const [query] = useSearchParams();
   const venues = useBookingData('venues');
+  const [advisors, setAdvisors] = useState([]);
   const [form, setForm] = useState({
     venue_id: query.get('venue') || '',
+    faculty_advisor_id: '',
     purpose: '',
     description: '',
     application_type: 'Academic',
@@ -24,6 +27,19 @@ export default function BookVenue() {
     start_time: query.get('start_time') || query.get('start') || '',
     end_time: query.get('end_time') || query.get('end') || '',
   });
+
+  useEffect(() => {
+    fetchFacultyAdvisors().then((data) => {
+      setAdvisors(data);
+      if (data.length > 0) {
+        setForm((prev) => ({
+          ...prev,
+          faculty_advisor_id: prev.faculty_advisor_id || data[0].user_id,
+        }));
+      }
+    });
+  }, []);
+
 
   useEffect(() => {
     const qVenue = query.get('venue');
@@ -138,16 +154,13 @@ export default function BookVenue() {
       setError('End time must be after start time.');
       return;
     }
-    if (currentAvailability?.available === false) {
-      setError('This venue is already reserved for that time.');
-      return;
-    }
     submitLock.current = true;
     setSubmitting(true);
     setError('');
     try {
       const saved = await createBooking({
         venue_id: Number(venue_id),
+        faculty_advisor_id: form.faculty_advisor_id ? Number(form.faculty_advisor_id) : undefined,
         purpose: form.purpose.trim(),
         description: form.description.trim(),
         application_type: form.application_type,
@@ -212,6 +225,27 @@ export default function BookVenue() {
                   </span>
                 </div>
               )}
+              {currentAvailability?.available === false && (
+                <div
+                  style={{
+                    background: '#fff9e6',
+                    border: '1px solid #ffd8a8',
+                    borderRadius: '10px',
+                    padding: '12px 16px',
+                    marginBottom: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontSize: '13px',
+                    color: '#9a3412',
+                  }}
+                >
+                  <Clock size={18} style={{ color: '#ea580c', flexShrink: 0 }} />
+                  <span>
+                    <strong>Notice:</strong> This venue is currently reserved for this time. You can still submit this request; if approved as high-priority, approvers will revoke and dynamically reassign the previous booking.
+                  </span>
+                </div>
+              )}
               <label>
                 Venue
                 <select
@@ -229,6 +263,27 @@ export default function BookVenue() {
                   ))}
                 </select>
               </label>
+              {advisors.length > 0 && (
+                <label>
+                  Faculty Advisor (Level 1 Reviewer)
+                  <select
+                    name="faculty_advisor_id"
+                    value={form.faculty_advisor_id}
+                    onChange={update}
+                    required
+                  >
+                    <option value="">Choose your Faculty Advisor</option>
+                    {advisors.map((adv) => (
+                      <option key={adv.user_id} value={adv.user_id}>
+                        {adv.full_name} ({adv.email})
+                      </option>
+                    ))}
+                  </select>
+                  <small style={{ color: '#685f74', fontSize: '11px', marginTop: '4px' }}>
+                    Your request will first be routed to this Faculty Advisor for endorsement, followed by Department HOD review.
+                  </small>
+                </label>
+              )}
               <label>
                 Event title
                 <input
@@ -365,8 +420,8 @@ export default function BookVenue() {
                 >
                   {currentAvailability.error ||
                     (currentAvailability.available
-                      ? 'Venue is available for this time. Availability is checked again when you submit.'
-                      : 'This venue is reserved for an overlapping time. Choose another slot.')}
+                      ? 'Venue is currently free for this time slot.'
+                      : 'This venue already has an existing reservation. You can still submit this request for priority review.')}
                 </p>
               )}
               {error && (
@@ -381,17 +436,15 @@ export default function BookVenue() {
                 <button
                   className="button primary"
                   type="submit"
-                  disabled={
-                    submitting ||
-                    currentAvailability?.available === false ||
-                    exceedsCapacity
-                  }
+                  disabled={submitting || exceedsCapacity}
                 >
                   {submitting
                     ? 'Submitting…'
                     : exceedsCapacity
                       ? 'Exceeds venue capacity'
-                      : 'Submit request'}
+                      : currentAvailability?.available === false
+                        ? 'Submit Priority Request'
+                        : 'Submit request'}
                 </button>
               </div>
             </form>

@@ -4,7 +4,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from app.core.dependencies import get_current_user
 from app.core.email import send_status_update_email
 from app.models.auth import UserProfile
-from app.models.booking import BookingCreate, BookingDecision
+from app.models.booking import BookingCreate, BookingDecision, BookingRevoke, BookingReassign
 from app.repositories import booking_repo
 
 router = APIRouter()
@@ -78,7 +78,7 @@ def create_booking(
 @router.get("")
 def list_bookings(
     scope: Literal["mine", "review"] = "mine",
-    status: Literal["submitted", "approved", "rejected", "cancelled"] | None = None,
+    status: Literal["submitted", "approved", "rejected", "cancelled", "needs_reassignment"] | None = None,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     user: UserProfile = Depends(get_current_user),
@@ -117,3 +117,38 @@ def booking_status(
         remarks=data.remarks,
     )
     return booking
+
+
+@router.post("/{booking_id}/revoke")
+def revoke_booking(
+    booking_id: int,
+    data: BookingRevoke,
+    background_tasks: BackgroundTasks,
+    user: UserProfile = Depends(get_current_user),
+):
+    booking = booking_repo.revoke_booking(booking_id, user.user_id, data)
+    queue_status_notification(
+        background_tasks,
+        booking,
+        "needs_reassignment",
+        remarks=f"Revocation by approver: {data.remarks}",
+    )
+    return booking
+
+
+@router.post("/{booking_id}/reassign")
+def reassign_booking(
+    booking_id: int,
+    data: BookingReassign,
+    background_tasks: BackgroundTasks,
+    user: UserProfile = Depends(get_current_user),
+):
+    booking = booking_repo.reassign_booking(booking_id, user.user_id, data)
+    queue_status_notification(
+        background_tasks,
+        booking,
+        "submitted",
+        remarks=f"Reassigned to new venue/timing: {data.remarks}",
+    )
+    return booking
+

@@ -31,5 +31,14 @@ def venue_details(venue_id: int):
 def availability(venue_id: int, times: TimeRange = Depends(requested_times)):
     venue_repo.get_venue(venue_id)
     with get_db_cursor(commit=False) as cur:
-        available = not venue_repo.has_conflict(cur, venue_id, times.start_time, times.end_time)
-    return {"venue_id": venue_id, "available": available, **times.model_dump()}
+        conflict = venue_repo.get_conflicting_booking(cur, venue_id, times.start_time, times.end_time)
+        available = conflict is None
+    return {
+        "venue_id": venue_id,
+        "available": available,
+        "is_occupied": conflict is not None,
+        "occupied_by_status": conflict["slot_status"] if conflict else None,
+        "conflicting_booking_id": conflict["application_id"] if conflict else None,
+        **times.model_dump(),
+    }
+

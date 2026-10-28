@@ -27,6 +27,7 @@ from app.repositories.user_repo import (
     get_all_organizational_units,
     get_approval_group_for_unit,
     update_user_profile,
+    get_all_faculty_advisors,
 )
 from app.repositories.otp_repo import (
     save_otp,
@@ -48,6 +49,11 @@ def list_departments():
     """Retrieve campus departments and academic units for approver registration."""
     units = get_all_organizational_units()
     return [UserDepartmentBrief(**u) for u in units]
+
+@router.get("/faculty-advisors")
+def list_faculty_advisors():
+    """Retrieve list of active Faculty Advisors for multi-level approval selection."""
+    return get_all_faculty_advisors()
 
 @router.post("/register", response_model=RegisterInitResponse, status_code=status.HTTP_200_OK)
 async def register_user(payload: UserRegisterRequest):

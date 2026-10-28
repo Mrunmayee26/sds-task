@@ -124,6 +124,15 @@ export async function fetchDepartments() {
   }
 }
 
+export async function fetchFacultyAdvisors() {
+  try {
+    return await apiRequest('api/v1/auth/faculty-advisors');
+  } catch {
+    return [];
+  }
+}
+
+
 export async function updateProfile(data) {
   try {
     const updatedUser = await apiRequest('api/v1/auth/profile', {

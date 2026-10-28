@@ -140,3 +140,20 @@ def update_user_profile(
         row = cur.fetchone()
         return dict(row) if row else None
 
+
+def get_all_faculty_advisors() -> List[Dict[str, Any]]:
+    """Retrieve all active faculty advisors."""
+    query = """
+        SELECT u.user_id, u.full_name, u.email, u.home_unit_id, ou.unit_name, gm.member_role
+        FROM users u
+        JOIN group_members gm ON gm.user_id = u.user_id
+        JOIN approval_groups ag ON ag.access_id = gm.access_id
+        LEFT JOIN organizational_units ou ON ou.unit_id = u.home_unit_id
+        WHERE ag.group_name = 'Faculty Advisors Committee' AND u.is_active = true AND gm.can_approve = true
+        ORDER BY u.full_name ASC;
+    """
+    with get_db_cursor(commit=False) as cur:
+        cur.execute(query)
+        return [dict(r) for r in cur.fetchall()]
+
+

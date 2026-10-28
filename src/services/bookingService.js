@@ -39,3 +39,8 @@ export const createBooking = (data) => changeBooking('', 'POST', data);
 export const cancelBooking = (id) => changeBooking(`/${id}/cancel`, 'POST');
 export const decideBooking = (id, status, remarks) =>
   changeBooking(`/${id}/status`, 'PATCH', { status, remarks });
+export const revokeBooking = (id, remarks) =>
+  changeBooking(`/${id}/revoke`, 'POST', { remarks });
+export const reassignBooking = (id, data) =>
+  changeBooking(`/${id}/reassign`, 'POST', data);
+
