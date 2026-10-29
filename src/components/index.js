@@ -16,5 +16,3 @@ export { default as ConflictBanner } from './Booking/ConflictBanner';
 export { default as RevokePanel } from './Booking/RevokePanel';
 export { default as ReassignPanel } from './Booking/ReassignPanel';
 export { default as WeeklyCalendar } from './Calendar/WeeklyCalendar';
-
-

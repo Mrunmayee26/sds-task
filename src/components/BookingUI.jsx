@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useState } from 'react';
 import { dateLabel, statusLabel, timeLabel } from '../services/format';
 
 export function PageHeading({
@@ -47,6 +48,7 @@ export function Status({ value }) {
 }
 
 export function BookingTable({ bookings, role, empty = 'No bookings yet.' }) {
+  const [now] = useState(Date.now);
   if (!bookings.length)
     return (
       <div className="empty-state">
@@ -77,6 +79,13 @@ export function BookingTable({ bookings, role, empty = 'No bookings yet.' }) {
             <tr key={booking.application_id}>
               <td>
                 <strong>{booking.purpose}</strong>
+                {booking.status === 'submitted' &&
+                  new Date(booking.submitted_at).getTime() <
+                    now - 24 * 3600000 && (
+                    <small style={{ color: '#a96d0e' }}>
+                      Waiting over 24 hours
+                    </small>
+                  )}
                 <small>
                   #{booking.application_id} ·{' '}
                   {booking.applicant_name || booking.application_type}

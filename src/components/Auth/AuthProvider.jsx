@@ -29,9 +29,11 @@ export default function AuthProvider({ children }) {
       .then((user) => {
         if (controller.signal.aborted) return;
         const role =
-          stored.role === 'approver' && canApprove(user)
-            ? 'approver'
-            : 'applicant';
+          stored.role === 'admin' && user.user_type === 'admin'
+            ? 'admin'
+            : stored.role === 'approver' && canApprove(user)
+              ? 'approver'
+              : 'applicant';
         const verified = { ...stored, user, role };
         sessionStorage.setItem(
           'venueflow_session_v1',

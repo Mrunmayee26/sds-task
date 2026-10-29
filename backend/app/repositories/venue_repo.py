@@ -1,4 +1,5 @@
 """Small parameterized SQL queries for the existing campus catalog."""
+
 from fastapi import HTTPException
 from app.db.session import get_db_cursor
 
@@ -12,21 +13,59 @@ VENUE_SELECT = """
 """
 
 
-def list_venues(search, venue_type, min_capacity, limit, offset):
+def list_venues(
+    search,
+    venue_type,
+    min_capacity,
+    limit,
+    offset,
+    location="",
+    amenity="",
+    start=None,
+    end=None,
+):
     with get_db_cursor(commit=False) as cur:
-        cur.execute(VENUE_SELECT + """
+        cur.execute(
+            VENUE_SELECT + """
             WHERE v.is_active AND (%s = '' OR v.venue_name ILIKE %s)
               AND (%s IS NULL OR v.venue_type = %s)
               AND (%s IS NULL OR v.capacity >= %s)
+              AND (%s='' OR COALESCE(b.building_name,'') ILIKE %s OR COALESCE(v.location_description,'') ILIKE %s)
+              AND (%s='' OR %s=ANY(v.amenities))
+              AND (%s::timestamptz IS NULL OR (
+                NOT EXISTS(SELECT 1 FROM booking_slots s WHERE s.venue_id=v.venue_id AND s.slot_status='confirmed' AND s.start_time<%s AND s.end_time>%s)
+                AND NOT EXISTS(SELECT 1 FROM venue_blackouts x WHERE x.venue_id=v.venue_id AND x.cancelled_at IS NULL AND x.start_time<%s AND x.end_time>%s)))
             ORDER BY v.venue_name, v.venue_id LIMIT %s OFFSET %s
-        """, (search, f"%{search}%", venue_type, venue_type,
-              min_capacity, min_capacity, limit, offset))
+        """,
+            (
+                search,
+                f"%{search}%",
+                venue_type,
+                venue_type,
+                min_capacity,
+                min_capacity,
+                location,
+                f"%{location}%",
+                f"%{location}%",
+                amenity,
+                amenity,
+                start,
+                end,
+                start,
+                end,
+                start,
+                limit,
+                offset,
+            ),
+        )
         return cur.fetchall()
 
 
 def get_venue(venue_id):
     with get_db_cursor(commit=False) as cur:
-        cur.execute(VENUE_SELECT + " WHERE v.venue_id = %s AND v.is_active", (venue_id,))
+        cur.execute(
+            VENUE_SELECT + " WHERE v.venue_id = %s AND v.is_active", (venue_id,)
+        )
         venue = cur.fetchone()
         if not venue:
             raise HTTPException(404, "Venue not found")
@@ -44,36 +83,31 @@ def lock_venue(cur, venue_id):
 
 
 def has_conflict(cur, venue_id, start_time, end_time, exclude_id=0):
-    cur.execute("""
+    cur.execute(
+        """
         SELECT 1 FROM booking_slots
         WHERE venue_id = %s AND slot_status IN ('pending', 'confirmed')
           AND start_time < %s AND end_time > %s AND application_id <> %s
         LIMIT 1
-    """, (venue_id, end_time, start_time, exclude_id))
+    """,
+        (venue_id, end_time, start_time, exclude_id),
+    )
     return cur.fetchone() is not None
 
 
-def has_confirmed_conflict(cur, venue_id, start_time, end_time, exclude_id=0):
-    cur.execute("""
-        SELECT 1 FROM booking_slots
-        WHERE venue_id = %s AND slot_status = 'confirmed'
-          AND start_time < %s AND end_time > %s AND application_id <> %s
-        LIMIT 1
-    """, (venue_id, end_time, start_time, exclude_id))
+def is_blocked(cur, venue_id, start, end):
+    cur.execute(
+        """SELECT 1 FROM venue_blackouts WHERE venue_id=%s AND cancelled_at IS NULL
+                   AND start_time<%s AND end_time>%s LIMIT 1""",
+        (venue_id, end, start),
+    )
     return cur.fetchone() is not None
 
 
-def get_conflicting_booking(cur, venue_id, start_time, end_time, exclude_id=0):
-    cur.execute("""
-        SELECT s.application_id, s.slot_status, a.purpose, a.status AS application_status,
-               u.full_name AS applicant_name
-        FROM booking_slots s
-        JOIN applications a ON a.application_id = s.application_id
-        LEFT JOIN users u ON u.user_id = a.applicant_user_id
-        WHERE s.venue_id = %s AND s.slot_status IN ('pending', 'confirmed')
-          AND s.start_time < %s AND s.end_time > %s AND s.application_id <> %s
-        ORDER BY CASE WHEN s.slot_status = 'confirmed' THEN 1 ELSE 2 END, s.slot_id
-        LIMIT 1
-    """, (venue_id, end_time, start_time, exclude_id))
-    return cur.fetchone()
-
+def confirmed_conflict(cur, venue_id, start, end, exclude_id=0):
+    cur.execute(
+        """SELECT 1 FROM booking_slots WHERE venue_id=%s AND slot_status='confirmed'
+                   AND start_time<%s AND end_time>%s AND application_id<>%s LIMIT 1""",
+        (venue_id, end, start, exclude_id),
+    )
+    return cur.fetchone() is not None

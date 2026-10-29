@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState } from "react";
 
-export default function RevokePanel({ within24h, busy, onRevoke }) {
+export default function RevokePanel({ withinDeadline, busy, onRevoke }) {
   const [showForm, setShowForm] = useState(false);
-  const [remarks, setRemarks] = useState('');
+  const [remarks, setRemarks] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -11,18 +11,26 @@ export default function RevokePanel({ within24h, busy, onRevoke }) {
   };
 
   return (
-    <section className="panel detail-panel" style={{ border: '1px solid #ffd8a8', background: '#fffdfa' }}>
+    <section
+      className="panel detail-panel"
+      style={{ border: "1px solid #ffd8a8", background: "#fffdfa" }}
+    >
       <div className="section-heading">
         <div>
-          <h2 style={{ color: '#9a3412' }}>Approver Revocation</h2>
-          <p className="muted" style={{ margin: '4px 0 0 0', fontSize: '12px' }}>
-            Revoking an assigned class frees the venue slot and prompts the applicant for dynamic reassignment.
+          <h2 style={{ color: "#9a3412" }}>Approver Revocation</h2>
+          <p
+            className="muted"
+            style={{ margin: "4px 0 0 0", fontSize: "12px" }}
+          >
+            Revoking an assigned class frees the venue slot and prompts the
+            applicant for dynamic reassignment.
           </p>
         </div>
       </div>
-      {within24h ? (
-        <p className="muted" style={{ color: '#b45309', fontWeight: '500' }}>
-          Revocation is blocked because the event is 1 day or less away (1-Day Revoke Guardrail).
+      {withinDeadline ? (
+        <p className="muted" style={{ color: "#b45309", fontWeight: "500" }}>
+          Revocation is blocked because the event is less than eight hours away
+          (Eight-hour deadline).
         </p>
       ) : !showForm ? (
         <button
@@ -33,7 +41,7 @@ export default function RevokePanel({ within24h, busy, onRevoke }) {
           Revoke this Booking
         </button>
       ) : (
-        <form onSubmit={handleSubmit} style={{ marginTop: '12px' }}>
+        <form onSubmit={handleSubmit} style={{ marginTop: "12px" }}>
           <label>
             Reason for Revocation (Required)
             <textarea
@@ -44,7 +52,7 @@ export default function RevokePanel({ within24h, busy, onRevoke }) {
               required
             />
           </label>
-          <div className="form-actions" style={{ marginTop: '10px' }}>
+          <div className="form-actions" style={{ marginTop: "10px" }}>
             <button
               type="button"
               className="button secondary"
@@ -53,8 +61,12 @@ export default function RevokePanel({ within24h, busy, onRevoke }) {
             >
               Cancel
             </button>
-            <button type="submit" className="button danger" disabled={busy || !remarks.trim()}>
-              {busy ? 'Revoking…' : 'Confirm Revoke & Trigger Reassignment'}
+            <button
+              type="submit"
+              className="button danger"
+              disabled={busy || !remarks.trim()}
+            >
+              {busy ? "Revoking…" : "Confirm Revoke & Trigger Reassignment"}
             </button>
           </div>
         </form>

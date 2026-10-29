@@ -1,5 +1,5 @@
-import { Clock, ShieldCheck, UserRound } from 'lucide-react';
-import authStyles from '../../pages/Login.module.css';
+import { Clock, ShieldCheck, UserRound } from "lucide-react";
+import authStyles from "../../pages/Login.module.css";
 
 export default function RoleSelector({ role, onChangeRole }) {
   return (
@@ -9,15 +9,15 @@ export default function RoleSelector({ role, onChangeRole }) {
         <div className={authStyles.roleOptions}>
           <label
             className={`${authStyles.roleCard} ${
-              role === 'applicant' ? authStyles.roleCardSelected : ''
+              role === "applicant" ? authStyles.roleCardSelected : ""
             }`}
           >
             <input
               type="radio"
               name="account-role"
               value="applicant"
-              checked={role === 'applicant'}
-              onChange={() => onChangeRole('applicant')}
+              checked={role === "applicant"}
+              onChange={() => onChangeRole("applicant")}
               className={authStyles.roleRadio}
             />
             <span className={authStyles.roleIcon}>
@@ -31,15 +31,15 @@ export default function RoleSelector({ role, onChangeRole }) {
 
           <label
             className={`${authStyles.roleCard} ${
-              role === 'approver' ? authStyles.roleCardSelected : ''
+              role === "approver" ? authStyles.roleCardSelected : ""
             }`}
           >
             <input
               type="radio"
               name="account-role"
               value="approver"
-              checked={role === 'approver'}
-              onChange={() => onChangeRole('approver')}
+              checked={role === "approver"}
+              onChange={() => onChangeRole("approver")}
               className={authStyles.roleRadio}
             />
             <span className={authStyles.roleIcon}>
@@ -53,21 +53,21 @@ export default function RoleSelector({ role, onChangeRole }) {
         </div>
       </fieldset>
 
-      {role === 'approver' && (
+      {role === "approver" && (
         <div
           style={{
-            background: '#f8f5ff',
-            border: '1px solid rgba(112, 71, 235, 0.22)',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            fontSize: '11.5px',
-            color: '#5b21b6',
-            lineHeight: '1.45',
+            background: "#f8f5ff",
+            border: "1px solid rgba(112, 71, 235, 0.22)",
+            borderRadius: "10px",
+            padding: "10px 14px",
+            fontSize: "11.5px",
+            color: "#5b21b6",
+            lineHeight: "1.45",
           }}
         >
           <Clock
             size={14}
-            style={{ verticalAlign: 'middle', marginRight: '6px' }}
+            style={{ verticalAlign: "middle", marginRight: "6px" }}
           />
           <strong>Admin Verification:</strong> Faculty Approver accounts require
           administrator verification. Access is granted once verified.

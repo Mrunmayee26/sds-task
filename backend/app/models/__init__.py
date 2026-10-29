@@ -22,4 +22,5 @@ __all__ = [
     "RegisterInitResponse",
     "VerifyOtpRequest",
     "ResendOtpRequest",
+    "UserDepartmentBrief",
 ]
