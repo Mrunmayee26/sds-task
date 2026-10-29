@@ -17,7 +17,7 @@ remain available for audit.
 | Registration | Email OTP for applicants and department reviewer requests; reviewer signup creates an ordinary account with a pending access request, and only an administrator grants reviewer permissions |
 | Abuse protection | Shared Redis limits for login, OTP attempts, registration, resend, password recovery and drafting notices; configured college email domains |
 | Account security | Disabling an account stops API access immediately; re-enabling does not revive old sessions. Password reset also revokes old sessions |
-| Password recovery | Email links with hashed, single-use tokens and a 30-minute expiry; new password screen |
+| Password recovery | Email a six-digit code (10-minute expiry), verify the code, then enter and confirm a new password. Codes are HMAC hashed, verification is rate limited, reset authorization is single use, and existing sessions are revoked. Older emailed reset links remain supported |
 | Competing bookings | Requests may overlap pending or confirmed requests. Only one overlapping booking may become confirmed; reviewers explicitly choose replacement when appropriate |
 | Cancellation policy | Applicants, assigned reviewers and admins can cancel only at least eight hours before the event; replacement obeys the same deadline |
 | Campus approval stages | When configured, the selected faculty advisor reviews first, followed by the venue's primary committee and the Dean for larger venue types. Additional venue committees and their any/all/minimum rules are preserved |

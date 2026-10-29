@@ -10,29 +10,53 @@ import styles from './Login.module.css';
 
 export function Recovery({ reset = false }) {
   const [query] = useSearchParams();
+  const [step, setStep] = useState(reset ? 'password' : 'email');
+  const [email, setEmail] = useState('');
+  const [token, setToken] = useState(query.get('token') || '');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
+  async function submit(event) {
+    event.preventDefault();
+    if (busy) return;
+    const data = new FormData(event.currentTarget);
     setError('');
     setMessage('');
-    const data = new FormData(e.currentTarget);
+    if (
+      step === 'password' &&
+      data.get('password') !== data.get('confirmPassword')
+    ) {
+      setError('Passwords do not match.');
+      return;
+    }
+    setBusy(true);
     try {
-      const result = await apiRequest(
-        `api/v1/auth/${reset ? 'reset-password' : 'forgot-password'}`,
-        {
+      if (step === 'email') {
+        const address = String(data.get('email')).trim().toLowerCase();
+        const saved = await apiRequest('api/v1/auth/request-password-otp', {
           method: 'POST',
-          body: reset
-            ? {
-                token: query.get('token') || '',
-                password: data.get('password'),
-              }
-            : { email: data.get('email') },
-        },
-      );
-      setMessage(result.message);
+          body: { email: address },
+        });
+        setEmail(address);
+        setMessage(saved.message);
+        setStep('otp');
+      } else if (step === 'otp') {
+        const saved = await apiRequest('api/v1/auth/verify-password-otp', {
+          method: 'POST',
+          body: { email, otp: String(data.get('otp')).trim() },
+        });
+        setToken(saved.token);
+        setMessage(saved.message);
+        setStep('password');
+      } else {
+        const saved = await apiRequest('api/v1/auth/reset-password', {
+          method: 'POST',
+          body: { token, password: data.get('password') },
+        });
+        setToken('');
+        setMessage(saved.message);
+        setStep('done');
+      }
     } catch (failure) {
       setError(failure.message);
     } finally {
@@ -44,37 +68,124 @@ export function Recovery({ reset = false }) {
       <AuthBrandPanel />
       <section className={styles.formPanel}>
         <div className={styles.formContent}>
-          <h2>{reset ? 'Set a new password' : 'Forgot your password?'}</h2>
-          <form className={styles.form} onSubmit={submit}>
-            <div className={styles.field}>
-              <label htmlFor="recovery-field">
-                {reset ? 'New password' : 'College email'}
-              </label>
-              <div className={styles.inputWrap}>
-                <input
-                  id="recovery-field"
-                  name={reset ? 'password' : 'email'}
-                  type={reset ? 'password' : 'email'}
-                  minLength={reset ? 6 : undefined}
-                  maxLength={reset ? 72 : 254}
-                  required
-                  autoComplete={reset ? 'new-password' : 'email'}
-                />
+          <h2>
+            {step === 'email'
+              ? 'Forgot your password?'
+              : step === 'otp'
+                ? 'Verify your email'
+                : step === 'done'
+                  ? 'Password updated'
+                  : 'Set a new password'}
+          </h2>
+          {step === 'email' && (
+            <p>
+              Enter your college email to receive a six-digit verification code.
+            </p>
+          )}
+          {step === 'otp' && (
+            <p>Enter the code sent to {email}. It expires in 10 minutes.</p>
+          )}
+          <form className={styles.form} onSubmit={submit} key={step}>
+            {step === 'email' && (
+              <div className={styles.field}>
+                <label htmlFor="recovery-email">College email</label>
+                <div className={styles.inputWrap}>
+                  <input
+                    id="recovery-email"
+                    name="email"
+                    type="email"
+                    required
+                    maxLength={254}
+                    autoComplete="email"
+                    defaultValue={email}
+                  />
+                </div>
               </div>
-            </div>
+            )}
+            {step === 'otp' && (
+              <div className={styles.field}>
+                <label htmlFor="recovery-otp">Verification code</label>
+                <div className={styles.inputWrap}>
+                  <input
+                    id="recovery-otp"
+                    name="otp"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{6}"
+                    minLength={6}
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    required
+                  />
+                </div>
+              </div>
+            )}
+            {step === 'password' && token && (
+              <>
+                {[
+                  ['password', 'New password'],
+                  ['confirmPassword', 'Confirm password'],
+                ].map(([name, label]) => (
+                  <div className={styles.field} key={name}>
+                    <label htmlFor={name}>{label}</label>
+                    <div className={styles.inputWrap}>
+                      <input
+                        id={name}
+                        name={name}
+                        type="password"
+                        required
+                        minLength={6}
+                        maxLength={72}
+                        autoComplete="new-password"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+            {step === 'password' && !token && (
+              <p role="alert">
+                This reset link is missing its token. Request a new verification
+                code.
+              </p>
+            )}
             {message && <p role="status">{message}</p>}
             {error && (
               <p className={styles.error} role="alert">
                 {error}
               </p>
             )}
-            <button className={styles.submit} disabled={busy}>
-              {busy
-                ? 'Sending…'
-                : reset
-                  ? 'Update password'
-                  : 'Send recovery link'}
-            </button>
+            {step !== 'done' && (
+              <button
+                className={styles.submit}
+                disabled={busy || (step === 'password' && !token)}
+              >
+                {busy
+                  ? 'Please wait…'
+                  : step === 'email'
+                    ? 'Send verification code'
+                    : step === 'otp'
+                      ? 'Verify code'
+                      : 'Update password'}
+              </button>
+            )}
+            {step === 'otp' && (
+              <button
+                type="button"
+                disabled={busy}
+                className={styles.textLink}
+                onClick={() => {
+                  setStep('email');
+                  setError('');
+                  setMessage('');
+                }}
+              >
+                Change email or request a new code
+              </button>
+            )}
+            {step === 'password' && !token && (
+              <Link to="/forgot-password">Request a new code</Link>
+            )}
             <Link to="/">Back to sign in</Link>
           </form>
         </div>
