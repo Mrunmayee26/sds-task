@@ -6,6 +6,8 @@ from app.core.email import send_status_update_email
 from app.models.auth import UserProfile
 from app.models.booking import BookingCreate, BookingDecision, BookingRevoke, BookingReassign
 from app.repositories import booking_repo
+from pydantic import AwareDatetime
+from app.db.session import get_db_cursor
 
 router = APIRouter()
 IST = timezone(timedelta(hours=5, minutes=30))
@@ -71,6 +73,9 @@ def create_booking(
     user: UserProfile = Depends(get_current_user),
 ):
     booking = booking_repo.create_booking(data, user.user_id)
+    from .holds import release_holds
+
+    release_holds(user.user_id)
     queue_status_notification(background_tasks, booking, "submitted")
     return booking
 
@@ -78,17 +83,57 @@ def create_booking(
 @router.get("")
 def list_bookings(
     scope: Literal["mine", "review"] = "mine",
-    status: Literal["submitted", "approved", "rejected", "cancelled", "needs_reassignment"] | None = None,
+    status: Literal[
+        "submitted", "approved", "rejected", "cancelled", "needs_reassignment"
+    ]
+    | None = None,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     user: UserProfile = Depends(get_current_user),
+    search: str = "",
+    start_time: AwareDatetime | None = None,
+    end_time: AwareDatetime | None = None,
 ):
-    return booking_repo.list_bookings(user.user_id, scope, status, limit, offset)
+    from fastapi import HTTPException
+
+    if (start_time is None) != (end_time is None) or (
+        start_time and end_time <= start_time
+    ):
+        raise HTTPException(422, "Supply a valid start and end time together.")
+    return booking_repo.list_bookings(
+        user.user_id, scope, status, limit, offset, search, start_time, end_time
+    )
+
+
+@router.get("/summary")
+def summary(
+    scope: Literal["mine", "review"] = "mine",
+    user: UserProfile = Depends(get_current_user),
+):
+    condition = "a.applicant_user_id=%s"
+    if scope == "review":
+        condition = (
+            "EXISTS(SELECT 1 FROM application_approvals aa WHERE aa.application_id=a.application_id AND EXISTS("
+            + booking_repo.MEMBER_CHECK
+            + "))"
+        )
+    with get_db_cursor(commit=False) as cur:
+        cur.execute(
+            """SELECT COUNT(*) AS total,COUNT(*) FILTER(WHERE a.status='submitted') AS pending,
+            COUNT(*) FILTER(WHERE a.status='approved') AS approved,
+            COUNT(*) FILTER(WHERE a.status='approved' AND EXISTS(SELECT 1 FROM booking_slots s WHERE s.application_id=a.application_id AND s.start_time>NOW())) AS upcoming
+            FROM applications a WHERE """
+            + condition,
+            (user.user_id,),
+        )
+        return cur.fetchone()
 
 
 @router.get("/{booking_id}")
 def booking_details(booking_id: int, user: UserProfile = Depends(get_current_user)):
-    return booking_repo.get_booking(booking_id, user.user_id)
+    return booking_repo.get_booking(
+        booking_id, user.user_id, getattr(user, "user_type", None) == "admin"
+    )
 
 
 @router.post("/{booking_id}/cancel")
@@ -97,7 +142,9 @@ def cancel_booking(
     background_tasks: BackgroundTasks,
     user: UserProfile = Depends(get_current_user),
 ):
-    booking = booking_repo.cancel_booking(booking_id, user.user_id)
+    booking = booking_repo.cancel_booking(
+        booking_id, user.user_id, getattr(user, "user_type", None) == "admin"
+    )
     queue_status_notification(background_tasks, booking, "cancelled")
     return booking
 
@@ -151,4 +198,3 @@ def reassign_booking(
         remarks=f"Reassigned to new venue/timing: {data.remarks}",
     )
     return booking
-

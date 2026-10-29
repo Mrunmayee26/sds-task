@@ -9,6 +9,7 @@ import { useAuth } from '../hooks/useAuth';
 import { fetchFacultyAdvisors } from '../services/auth';
 import { checkAvailability, createBooking } from '../services/bookingService';
 import { campusTimestamp, dateKey, dateLabel, timeLabel } from '../services/format';
+import { apiRequest } from '../services/apiClient';
 
 export default function BookVenue() {
   const { user, session } = useAuth();
@@ -39,7 +40,6 @@ export default function BookVenue() {
       }
     });
   }, []);
-
 
   useEffect(() => {
     const qVenue = query.get('venue');
@@ -97,7 +97,6 @@ export default function BookVenue() {
     setError('');
   };
   const { venue_id, date, start_time, end_time } = form;
-
   useEffect(() => {
     if (!venue_id || !date || !start_time || !end_time) return;
     const controller = new AbortController();
@@ -112,7 +111,9 @@ export default function BookVenue() {
           if (!controller.signal.aborted)
             setAvailability({
               key: `${venue_id}/${date}/${start_time}/${end_time}`,
-              available: result.available,
+              available: result.can_request,
+              competing: result.competing_requests,
+              blocked: result.blocked,
             });
         })
         .catch((failure) => {
@@ -132,6 +133,42 @@ export default function BookVenue() {
     availability?.key === `${venue_id}/${date}/${start_time}/${end_time}`
       ? availability
       : null;
+  const [draftNotice, setDraftNotice] = useState('');
+  useEffect(() => {
+    if (
+      !venue_id ||
+      !date ||
+      !start_time ||
+      !end_time ||
+      end_time <= start_time
+    )
+      return;
+    const controller = new AbortController();
+    const update = () =>
+      apiRequest('api/v1/booking-holds', {
+        method: 'POST',
+        signal: controller.signal,
+        body: {
+          venue_id: Number(venue_id),
+          start_time: campusTimestamp(date, start_time),
+          end_time: campusTimestamp(date, end_time),
+        },
+      })
+        .then((result) => {
+          if (!controller.signal.aborted)
+            setDraftNotice(result.other_drafts ? result.message : '');
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) setDraftNotice(error.message);
+        });
+    const timer = setTimeout(update, 500);
+    const refresh = setInterval(update, 60000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(refresh);
+      controller.abort();
+    };
+  }, [venue_id, date, start_time, end_time]);
 
   async function submit(event) {
     event.preventDefault();
@@ -152,6 +189,10 @@ export default function BookVenue() {
     }
     if (end_time <= start_time) {
       setError('End time must be after start time.');
+      return;
+    }
+    if (currentAvailability?.blocked) {
+      setError('The administrator has marked this venue unavailable.');
       return;
     }
     submitLock.current = true;
@@ -413,15 +454,24 @@ export default function BookVenue() {
                   />
                 </label>
               </div>
+              {draftNotice && (
+                <p className="notice warning" role="status">
+                  {draftNotice}
+                </p>
+              )}
               {currentAvailability && (
                 <p
                   role="status"
                   className={`notice ${currentAvailability.available ? 'success' : 'warning'}`}
                 >
                   {currentAvailability.error ||
-                    (currentAvailability.available
-                      ? 'Venue is currently free for this time slot.'
-                      : 'This venue already has an existing reservation. You can still submit this request for priority review.')}
+                    (currentAvailability.blocked
+                      ? 'The administrator has marked this venue unavailable. Choose another slot.'
+                      : currentAvailability.available
+                        ? currentAvailability.competing
+                          ? 'An overlapping request already exists. You can submit a competing request; the reviewer decides priority.'
+                          : 'Venue is currently free for this time slot.'
+                        : 'This venue already has an existing reservation. You can still submit this request for priority review.')}
                 </p>
               )}
               {error && (
@@ -480,8 +530,8 @@ export default function BookVenue() {
               <hr />
               <h3>What happens next?</h3>
               <p className="muted">
-                Your selected time is reserved while reviewers consider your
-                request. Track its progress in My bookings.
+                Competing requests are allowed. Reviewers decide which request
+                gets the time slot. Track your request in My bookings.
               </p>
             </aside>
           </div>

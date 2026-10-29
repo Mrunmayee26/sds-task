@@ -55,7 +55,9 @@ export default function BookingDetails() {
   }, [bookingId, version]);
 
   useEffect(() => {
-    getVenues().then((data) => setVenueList(data.filter((v) => v.is_active))).catch(() => {});
+    getVenues()
+      .then((data) => setVenueList(data.filter((v) => v.is_active)))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -104,7 +106,9 @@ export default function BookingDetails() {
     try {
       const saved = await revokeBooking(bookingId, reason);
       setBooking(saved);
-      setMessage('Booking has been revoked. The applicant must dynamically reassign a new venue or timing.');
+      setMessage(
+        'Booking has been revoked. The applicant must dynamically reassign a new venue or timing.',
+      );
     } catch (failure) {
       setActionError(failure.message);
     } finally {
@@ -126,7 +130,9 @@ export default function BookingDetails() {
         remarks: form.remarks.trim(),
       });
       setBooking(saved);
-      setMessage('Booking reassigned successfully! The multi-level approval pipeline has restarted.');
+      setMessage(
+        'Booking reassigned successfully! The multi-level approval pipeline has restarted.',
+      );
     } catch (failure) {
       setActionError(failure.message);
     } finally {
@@ -136,9 +142,15 @@ export default function BookingDetails() {
   }
 
   const isOwner = booking?.applicant_user_id === user.user_id;
-  const pending = booking?.approvals?.filter((a) => a.status === 'pending') || [];
-  const firstStep = pending.length ? Math.min(...pending.map((a) => a.approval_step)) : null;
-  const myGroups = user.approval_groups?.filter((g) => g.can_approve)?.map((g) => g.access_id) || [];
+  const pending =
+    booking?.approvals?.filter((a) => a.status === 'pending') || [];
+  const firstStep = pending.length
+    ? Math.min(...pending.map((a) => a.approval_step))
+    : null;
+  const myGroups =
+    user.approval_groups
+      ?.filter((g) => g.can_approve)
+      ?.map((g) => g.access_id) || [];
 
   const myTurn =
     !isOwner &&
@@ -147,16 +159,25 @@ export default function BookingDetails() {
       (a) =>
         a.approval_step === firstStep &&
         myGroups.includes(a.access_id) &&
-        (a.access_id !== 18 || !booking.faculty_advisor_id || booking.faculty_advisor_id === user.user_id) &&
-        !booking.events?.some((e) => e.approval_id === a.approval_id && e.actor_user_id === user.user_id),
+        (a.access_id !== 18 ||
+          !booking.faculty_advisor_id ||
+          booking.faculty_advisor_id === user.user_id) &&
+        !booking.events?.some(
+          (e) =>
+            e.approval_id === a.approval_id && e.actor_user_id === user.user_id,
+        ),
     );
 
-  const activeSlots = booking?.slots?.filter((s) => s.slot_status !== 'cancelled') || [];
+  const activeSlots =
+    booking?.slots?.filter((s) => s.slot_status !== 'cancelled') || [];
   const earliestSlotTime = activeSlots.length
     ? Math.min(...activeSlots.map((s) => new Date(s.start_time).getTime()))
-    : (booking?.slots?.length ? Math.min(...booking.slots.map((s) => new Date(s.start_time).getTime())) : null);
+    : booking?.slots?.length
+      ? Math.min(...booking.slots.map((s) => new Date(s.start_time).getTime()))
+      : null;
 
-  const within24h = earliestSlotTime !== null && earliestSlotTime - now <= 24 * 60 * 60 * 1000;
+  const within24h =
+    earliestSlotTime !== null && earliestSlotTime - now <= 24 * 60 * 60 * 1000;
   const future = earliestSlotTime !== null && earliestSlotTime > now;
 
   const canApproverRevoke =
@@ -166,73 +187,92 @@ export default function BookingDetails() {
 
   return (
     <PortalLayout>
-      <PageHeading
-        title={booking?.purpose || 'Booking details.'}
-        action={
-          <Link
-            className="button secondary"
-            to={`/${session.role}/${session.role === 'approver' ? 'approvals' : 'applications'}`}
-          >
-            Back to requests
-          </Link>
-        }
-      >
-        Request #{bookingId}
+      <PageHeading title="Reservation details">
+        {booking
+          ? `${booking.purpose} · ${booking.venue_name}`
+          : 'Loading reservation'}
       </PageHeading>
-
-      <DataState loading={!booking && !error} error={error} refresh={refresh} />
-
-      {booking && !error && (
+      <DataState loading={!booking && !error} error={error} />
+      {booking && (
         <>
-          {message && <p className="notice success" role="status">{message}</p>}
+          {message && (
+            <p className="notice success" role="status">
+              {message}
+            </p>
+          )}
 
           {/* 1-Day Guardrail Banner */}
-          <GuardrailNotice within24h={within24h} future={future} status={booking.status} />
+          <GuardrailNotice
+            status={booking.status}
+            within24h={within24h}
+            future={future}
+          />
 
-          {/* Overlapping Confirmed Conflict Banner */}
-          <ConflictBanner conflicts={booking.conflicts} sessionRole={session.role} />
+          {/* Conflict Banner when booking needs reassignment */}
+          <ConflictBanner status={booking.status} isOwner={isOwner} />
 
-          {/* Core Booking Summary */}
           <section className="panel detail-panel">
             <div className="section-heading">
-              <div>
-                <h2>{booking.venue_name}</h2>
-                <span className="muted" style={{ fontSize: '12px', textTransform: 'capitalize' }}>
-                  {booking.venue_type ? booking.venue_type.replace(/_/g, ' ') : 'Campus Space'}
-                </span>
-              </div>
+              <h2>{booking.purpose}</h2>
               <Status value={booking.status} />
             </div>
-            <dl className="detail-grid">
-              <div>
-                <dt>Applicant</dt>
-                <dd>{booking.applicant_name}</dd>
+            <p className="description">{booking.description}</p>
+            <div className="stats-grid">
+              <div className="stat-card">
+                <span className="stat-label">VENUE</span>
+                <span className="stat-value">{booking.venue_name}</span>
               </div>
-              <div>
-                <dt>Faculty Advisor (Level 1)</dt>
-                <dd>{booking.faculty_advisor_name || 'Assigned Faculty Advisor'}</dd>
+              <div className="stat-card">
+                <span className="stat-label">TYPE</span>
+                <span className="stat-value">{booking.application_type}</span>
               </div>
-              <div>
-                <dt>Event type</dt>
-                <dd>{booking.application_type}</dd>
+              <div className="stat-card">
+                <span className="stat-label">ATTENDANCE</span>
+                <span className="stat-value">
+                  {booking.expected_attendance}
+                </span>
               </div>
-              <div>
-                <dt>Submitted</dt>
-                <dd>{dateLabel(booking.submitted_at)}</dd>
+              <div className="stat-card">
+                <span className="stat-label">APPLICANT</span>
+                <span className="stat-value">{booking.applicant_name}</span>
               </div>
-            </dl>
-            <h3>Description</h3>
-            <p className="description-text">{booking.description || 'No additional description.'}</p>
-            <h3>Reserved time</h3>
+            </div>
+          </section>
+
+          <section className="panel detail-panel">
+            <h2>Requested schedule</h2>
             {booking.slots.map((slot) => (
-              <p key={slot.slot_id} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Calendar size={15} style={{ color: '#7047eb' }} />
+              <p
+                key={slot.slot_id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  textDecoration:
+                    slot.slot_status === 'cancelled'
+                      ? 'line-through'
+                      : 'none',
+                  color:
+                    slot.slot_status === 'cancelled' ? '#999' : 'inherit',
+                }}
+              >
+                <Calendar size={16} />
                 <span>
-                  {dateLabel(slot.start_time)} · {timeLabel(slot.start_time)} – {timeLabel(slot.end_time)}
+                  {dateLabel(slot.start_time)}, {timeLabel(slot.start_time)} –{' '}
+                  {timeLabel(slot.end_time)}
                 </span>
                 {slot.slot_status === 'cancelled' && (
-                  <span style={{ fontSize: '11px', color: '#c53030', fontWeight: '600', marginLeft: '6px' }}>
-                    (Slot Released)
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      background: '#fee2e2',
+                      color: '#b91c1c',
+                      padding: '2px 6px',
+                      borderRadius: '4px',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    Cancelled
                   </span>
                 )}
               </p>
@@ -253,8 +293,11 @@ export default function BookingDetails() {
                 {booking.events.map((event) => (
                   <li key={event.event_id}>
                     <strong>
-                      {event.decision ? 'Approval recorded' : 'Revocation / Rejection recorded'}{' '}
-                      · {dateLabel(event.created_at)} {timeLabel(event.created_at)}
+                      {event.decision
+                        ? 'Approval recorded'
+                        : 'Revocation / Rejection recorded'}{' '}
+                      · {dateLabel(event.created_at)}{' '}
+                      {timeLabel(event.created_at)}
                     </strong>
                     <span>{event.remarks || 'No remarks provided.'}</span>
                   </li>
@@ -263,7 +306,11 @@ export default function BookingDetails() {
             </section>
           )}
 
-          {actionError && <p className="notice error" role="alert">{actionError}</p>}
+          {actionError && (
+            <p className="notice error" role="alert">
+              {actionError}
+            </p>
+          )}
 
           {/* Dynamic Reassignment Form for Applicants */}
           {isOwner && booking.status === 'needs_reassignment' && (
@@ -275,34 +322,49 @@ export default function BookingDetails() {
             />
           )}
 
-          {/* Applicant Cancellation (Guardrail protected) */}
-          {isOwner && ['submitted', 'approved', 'needs_reassignment'].includes(booking.status) && (
-            <section className="panel detail-panel">
-              <h2>Change of plans?</h2>
-              {within24h ? (
-                <p className="muted" style={{ color: '#b45309' }}>
-                  <strong>Cancellation Locked:</strong> Events scheduled within 24 hours cannot be cancelled under the 1-Day Guardrail policy.
-                </p>
-              ) : (
-                <>
-                  <p className="muted">
-                    Cancelling releases the venue for other applicants. This cannot be undone.
+          {/* Applicant & Admin Cancellation (Guardrail protected) */}
+          {(isOwner || session.role === 'admin') &&
+            ['submitted', 'approved', 'needs_reassignment'].includes(
+              booking.status,
+            ) &&
+            future && (
+              <section className="panel detail-panel">
+                <h2>Change of plans?</h2>
+                {within24h && session.role !== 'admin' ? (
+                  <p className="muted" style={{ color: '#b45309' }}>
+                    <strong>Cancellation Locked:</strong> Events scheduled
+                    within 24 hours cannot be cancelled under the 1-Day Guardrail
+                    policy.
                   </p>
-                  <button
-                    className="button danger"
-                    disabled={busy}
-                    onClick={() => {
-                      if (window.confirm('Cancel this booking and release its time slot?')) {
-                        act('cancelled');
+                ) : (
+                  <>
+                    <p className="muted">
+                      Cancelling releases the venue for other applicants. This
+                      cannot be undone.
+                    </p>
+                    <button
+                      className="button danger"
+                      disabled={
+                        busy ||
+                        (session.role !== 'admin' &&
+                          booking.can_cancel === false)
                       }
-                    }}
-                  >
-                    {busy ? 'Saving…' : 'Cancel booking'}
-                  </button>
-                </>
-              )}
-            </section>
-          )}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            'Cancel this booking and release its time slot?',
+                          )
+                        ) {
+                          act('cancelled');
+                        }
+                      }}
+                    >
+                      {busy ? 'Saving…' : 'Cancel booking'}
+                    </button>
+                  </>
+                )}
+              </section>
+            )}
 
           {/* Approver Revocation Section (Guardrail protected) */}
           {canApproverRevoke && (

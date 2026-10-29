@@ -1,6 +1,7 @@
 """
 Authentication endpoints for registration, OTP email verification, login, and user profile.
 """
+
 import secrets
 from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.concurrency import run_in_threadpool
@@ -37,12 +38,15 @@ from app.repositories.otp_repo import (
 from app.core.security import hash_password, verify_password, create_access_token
 from app.core.email import send_otp_email
 from app.core.dependencies import get_current_user
+from app.core.cache import limit_attempts
 
 router = APIRouter()
+
 
 def generate_otp() -> str:
     """Generate a secure 6-digit numeric OTP."""
     return f"{secrets.randbelow(900000) + 100000:06d}"
+
 
 @router.get("/departments", response_model=List[UserDepartmentBrief])
 def list_departments():
@@ -50,12 +54,16 @@ def list_departments():
     units = get_all_organizational_units()
     return [UserDepartmentBrief(**u) for u in units]
 
+
 @router.get("/faculty-advisors")
 def list_faculty_advisors():
     """Retrieve list of active Faculty Advisors for multi-level approval selection."""
     return get_all_faculty_advisors()
 
-@router.post("/register", response_model=RegisterInitResponse, status_code=status.HTTP_200_OK)
+
+@router.post(
+    "/register", response_model=RegisterInitResponse, status_code=status.HTTP_200_OK
+)
 async def register_user(payload: UserRegisterRequest):
     """
     Initiates account registration by generating a 6-digit OTP and dispatching an email verification.
@@ -63,15 +71,25 @@ async def register_user(payload: UserRegisterRequest):
     """
     normalized_email = payload.email.strip().lower()
     user_type = payload.role.strip().lower() if payload.role else "applicant"
-    if user_type not in ("applicant", "approver"):
+    limit_attempts("register", normalized_email, 5, 60)
+    domain = normalized_email.rsplit("@", 1)[-1]
+    allowed_domains = {
+        value.strip().lower()
+        for value in settings.ALLOWED_EMAIL_DOMAINS.split(",")
+        if value.strip()
+    }
+    if allowed_domains and domain not in allowed_domains:
+        raise HTTPException(422, "Use an approved college email address.")
+    """if user_type != "applicant":
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Role must be either 'applicant' or 'approver'."
+            403, "Approver accounts must be assigned by an administrator."
+        )"""
+    if not settings.SMTP_ENABLED:
+        raise HTTPException(
+            503,
+            "Email verification is not configured. Contact the campus administrator to create an account.",
         )
 
-    if not settings.SMTP_ENABLED:
-        raise HTTPException(503, "Email verification is not configured. Contact the campus administrator to create an account.")
-    
     # Check if user already exists
     existing = await run_in_threadpool(get_user_by_email, normalized_email)
     if existing:
@@ -96,10 +114,14 @@ async def register_user(payload: UserRegisterRequest):
 
     # Generate 6-digit OTP and save in staging table
     otp_code = generate_otp()
-    await run_in_threadpool(save_otp, normalized_email, otp_code, staged_payload, expires_in_minutes=10)
+    await run_in_threadpool(
+        save_otp, normalized_email, otp_code, staged_payload, expires_in_minutes=10
+    )
 
     if not await send_otp_email(normalized_email, otp_code, full_name):
-        raise HTTPException(503, "Verification email could not be delivered. Please try again later.")
+        raise HTTPException(
+            503, "Verification email could not be delivered. Please try again later."
+        )
 
     return RegisterInitResponse(
         status="otp_sent",
@@ -107,7 +129,10 @@ async def register_user(payload: UserRegisterRequest):
         email=normalized_email,
     )
 
-@router.post("/verify-otp", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+
+@router.post(
+    "/verify-otp", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
+)
 def verify_registration_otp(payload: VerifyOtpRequest):
     """
     Verifies the 6-digit OTP.
@@ -115,6 +140,7 @@ def verify_registration_otp(payload: VerifyOtpRequest):
     For approvers: creates user record with is_active=False pending admin verification.
     """
     normalized_email = payload.email.strip().lower()
+    limit_attempts("otp", normalized_email, 5, 600)
     staged_data = verify_and_consume_otp(normalized_email, payload.otp.strip())
 
     if not staged_data:
@@ -159,7 +185,7 @@ def verify_registration_otp(payload: VerifyOtpRequest):
             user_id=user_id,
             access_id=access_id,
             member_role=staged_data.get("designation") or "Department Approver",
-            can_approve=True
+            can_approve=True,
         )
 
         return TokenResponse(
@@ -167,7 +193,7 @@ def verify_registration_otp(payload: VerifyOtpRequest):
             token_type="bearer",
             user=None,
             status="pending_admin_approval",
-            message="Your email has been verified! Your approver account has been submitted for administrator verification. You will be able to log in once approved by the campus administration."
+            message="Your email has been verified! Your approver account has been submitted for administrator verification. You will be able to log in once approved by the campus administration.",
         )
 
     groups_data = get_user_approval_groups(user_id)
@@ -176,8 +202,9 @@ def verify_registration_otp(payload: VerifyOtpRequest):
             access_id=g["access_id"],
             group_name=g["group_name"],
             member_role=g["member_role"],
-            can_approve=g["can_approve"]
-        ) for g in groups_data
+            can_approve=g["can_approve"],
+        )
+        for g in groups_data
     ]
 
     profile = UserProfile(
@@ -192,8 +219,7 @@ def verify_registration_otp(payload: VerifyOtpRequest):
     )
 
     token = create_access_token(
-        subject=user_id,
-        claims={"email": normalized_email, "role": user_type}
+        subject=user_id, claims={"email": normalized_email, "role": user_type}
     )
 
     return TokenResponse(
@@ -201,8 +227,9 @@ def verify_registration_otp(payload: VerifyOtpRequest):
         token_type="bearer",
         user=profile,
         status="verified",
-        message="Account verified and created successfully."
+        message="Account verified and created successfully.",
     )
+
 
 @router.post("/resend-otp", response_model=RegisterInitResponse)
 async def resend_otp(payload: ResendOtpRequest):
@@ -210,8 +237,12 @@ async def resend_otp(payload: ResendOtpRequest):
     Resends a fresh 6-digit OTP for a pending registration.
     """
     normalized_email = payload.email.strip().lower()
+    limit_attempts("resend", normalized_email, 1, 60)
     if not settings.SMTP_ENABLED:
-        raise HTTPException(503, "Email verification is not configured. Contact the campus administrator.")
+        raise HTTPException(
+            503,
+            "Email verification is not configured. Contact the campus administrator.",
+        )
     pending = await run_in_threadpool(get_latest_pending_payload, normalized_email)
 
     if not pending:
@@ -221,11 +252,15 @@ async def resend_otp(payload: ResendOtpRequest):
         )
 
     new_otp = generate_otp()
-    await run_in_threadpool(save_otp, normalized_email, new_otp, pending, expires_in_minutes=10)
+    await run_in_threadpool(
+        save_otp, normalized_email, new_otp, pending, expires_in_minutes=10
+    )
 
     user_name = pending.get("full_name", "")
     if not await send_otp_email(normalized_email, new_otp, user_name):
-        raise HTTPException(503, "Verification email could not be delivered. Please try again later.")
+        raise HTTPException(
+            503, "Verification email could not be delivered. Please try again later."
+        )
 
     return RegisterInitResponse(
         status="otp_sent",
@@ -233,14 +268,16 @@ async def resend_otp(payload: ResendOtpRequest):
         email=normalized_email,
     )
 
+
 @router.post("/login", response_model=TokenResponse)
 def login_user(payload: UserLoginRequest):
     """
     Validates user credentials against database hash and returns signed JWT token.
     """
     normalized_email = payload.email.strip().lower()
+    limit_attempts("login", normalized_email, 10, 900)
     user = get_user_by_email(normalized_email)
-    
+
     if not user or not user.get("password_hash"):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -267,6 +304,8 @@ def login_user(payload: UserLoginRequest):
 
     # Role validation if specified by login UI
     requested_role = (payload.role or "").strip().lower()
+    if requested_role == "admin" and user["user_type"] != "admin":
+        raise HTTPException(403, "Administrator access required.")
     groups_data = get_user_approval_groups(user["user_id"])
     has_approval_rights = any(g["can_approve"] for g in groups_data)
 
@@ -281,8 +320,9 @@ def login_user(payload: UserLoginRequest):
             access_id=g["access_id"],
             group_name=g["group_name"],
             member_role=g["member_role"],
-            can_approve=g["can_approve"]
-        ) for g in groups_data
+            can_approve=g["can_approve"],
+        )
+        for g in groups_data
     ]
 
     profile = UserProfile(
@@ -298,10 +338,15 @@ def login_user(payload: UserLoginRequest):
 
     token = create_access_token(
         subject=user["user_id"],
-        claims={"email": user["email"], "role": user["user_type"]}
+        claims={
+            "email": user["email"],
+            "role": user["user_type"],
+            "session_version": user["session_version"],
+        },
     )
 
     return TokenResponse(access_token=token, token_type="bearer", user=profile)
+
 
 @router.get("/me", response_model=UserProfile)
 def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
@@ -310,10 +355,11 @@ def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
     """
     return current_user
 
+
 @router.put("/profile", response_model=UserProfile)
 def update_profile(
     payload: UserProfileUpdate,
-    current_user: UserProfile = Depends(get_current_user)
+    current_user: UserProfile = Depends(get_current_user),
 ):
     """
     Updates the display name and home department of the currently logged-in user.
@@ -342,8 +388,9 @@ def update_profile(
             access_id=g["access_id"],
             group_name=g["group_name"],
             member_role=g["member_role"],
-            can_approve=g["can_approve"]
-        ) for g in groups_data
+            can_approve=g["can_approve"],
+        )
+        for g in groups_data
     ]
 
     return UserProfile(
@@ -356,4 +403,3 @@ def update_profile(
         is_active=fresh_user["is_active"],
         approval_groups=groups,
     )
-

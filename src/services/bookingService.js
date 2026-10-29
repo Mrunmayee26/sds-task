@@ -13,9 +13,10 @@ async function readAll(path, signal) {
   }
 }
 
-export const getVenues = (signal) => readAll('api/v1/venues', signal);
-export const getBookings = (scope, signal) =>
-  readAll(`api/v1/bookings?scope=${scope}`, signal);
+export const getVenues = (signal, query = '') =>
+  readAll(`api/v1/venues?${query}`, signal);
+export const getBookings = (scope, signal, query = '') =>
+  apiRequest(`api/v1/bookings?scope=${scope}&limit=25&${query}`, { signal });
 export const getBooking = (id, signal) =>
   apiRequest(`api/v1/bookings/${id}`, { signal });
 
@@ -37,10 +38,13 @@ async function changeBooking(path, method, body) {
 
 export const createBooking = (data) => changeBooking('', 'POST', data);
 export const cancelBooking = (id) => changeBooking(`/${id}/cancel`, 'POST');
-export const decideBooking = (id, status, remarks) =>
-  changeBooking(`/${id}/status`, 'PATCH', { status, remarks });
+export const decideBooking = (id, status, remarks, replace_conflicts = false) =>
+  changeBooking(`/${id}/status`, 'PATCH', {
+    status,
+    remarks,
+    replace_conflicts,
+  });
 export const revokeBooking = (id, remarks) =>
   changeBooking(`/${id}/revoke`, 'POST', { remarks });
 export const reassignBooking = (id, data) =>
   changeBooking(`/${id}/reassign`, 'POST', data);
-
