@@ -1,4 +1,5 @@
 """Request validation. All times must include a timezone, for example +05:30."""
+
 from datetime import datetime, timezone
 from typing import Literal
 
@@ -25,9 +26,23 @@ class BookingCreate(TimeRange):
     description: str = Field(default="", max_length=5000)
     application_type: str = Field(default="Academic", min_length=1, max_length=40)
     expected_attendance: int = Field(gt=0)
+    faculty_advisor_id: int | None = Field(default=None, gt=0)
 
 
 class BookingDecision(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
     status: Literal["approved", "rejected"]
     remarks: str = Field(default="", max_length=2000)
+    replace_conflicts: bool = False
+
+
+class BookingRevoke(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    remarks: str = Field(min_length=1, max_length=2000)
+
+
+class BookingReassign(TimeRange):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    venue_id: int = Field(gt=0)
+    remarks: str = Field(default="", max_length=2000)
+    expected_attendance: int | None = Field(default=None, gt=0)

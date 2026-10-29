@@ -1,5 +1,9 @@
 # COEP VenueFlow — Database & Backend Context
 
+> Admin upgrade: `UPGRADES.md` documents the additive admin tables, venue blackouts,
+> notifications, password reset tokens, audit history, user session versions and
+> venue amenities. Original records were preserved; protected backend tables have RLS enabled.
+>
 > Implementation update: venue, availability, booking, cancellation and multi-stage
 > approval APIs now exist under `/api/v1`. See `README.md` in this directory for
 > the current contract. The backend uses the existing documented tables without

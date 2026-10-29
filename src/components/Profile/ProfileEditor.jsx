@@ -1,70 +1,67 @@
-import { useEffect, useState } from 'react';
-import { Edit2, Save, X } from 'lucide-react';
-import { fetchDepartments, updateProfile } from '../../services/auth';
+import { useEffect, useState } from "react";
+import { Edit2, Save, X } from "lucide-react";
+import { fetchDepartments, updateProfile } from "../../services/auth";
 
 export default function ProfileEditor({ user }) {
   const [isEditing, setIsEditing] = useState(false);
-  const [fullName, setFullName] = useState(user?.full_name || '');
+  const [fullName, setFullName] = useState(user?.full_name || "");
   const [homeUnitId, setHomeUnitId] = useState(
-    user?.home_unit_id ? String(user.home_unit_id) : '',
+    user?.home_unit_id ? String(user.home_unit_id) : "",
   );
   const [departments, setDepartments] = useState([]);
   const [saving, setSaving] = useState(false);
-  const [statusMsg, setStatusMsg] = useState({ type: '', text: '' });
-
-  useEffect(() => {
-    if (user) {
-      setFullName(user.full_name || '');
-      setHomeUnitId(user.home_unit_id ? String(user.home_unit_id) : '');
-    }
-  }, [user]);
+  const [statusMsg, setStatusMsg] = useState({ type: "", text: "" });
 
   useEffect(() => {
     let active = true;
-    fetchDepartments().then((data) => {
-      if (active && Array.isArray(data)) {
-        setDepartments(data);
-      }
-    });
+    fetchDepartments()
+      .then((data) => {
+        if (active && Array.isArray(data)) {
+          setDepartments(data);
+        }
+      })
+      .catch((error) => {
+        if (active) setStatusMsg({ type: "error", text: error.message });
+      });
     return () => {
       active = false;
     };
   }, []);
 
   const handleStartEdit = () => {
-    setFullName(user?.full_name || '');
-    setHomeUnitId(user?.home_unit_id ? String(user.home_unit_id) : '');
-    setStatusMsg({ type: '', text: '' });
+    setFullName(user?.full_name || "");
+    setHomeUnitId(user?.home_unit_id ? String(user.home_unit_id) : "");
+    setStatusMsg({ type: "", text: "" });
     setIsEditing(true);
   };
 
   const handleCancelEdit = () => {
-    setFullName(user?.full_name || '');
-    setHomeUnitId(user?.home_unit_id ? String(user.home_unit_id) : '');
-    setStatusMsg({ type: '', text: '' });
+    setFullName(user?.full_name || "");
+    setHomeUnitId(user?.home_unit_id ? String(user.home_unit_id) : "");
+    setStatusMsg({ type: "", text: "" });
     setIsEditing(false);
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
     if (!fullName.trim()) {
-      setStatusMsg({ type: 'error', text: 'Full name cannot be blank.' });
+      setStatusMsg({ type: "error", text: "Full name cannot be blank." });
       return;
     }
     setSaving(true);
-    setStatusMsg({ type: '', text: '' });
+    setStatusMsg({ type: "", text: "" });
     const res = await updateProfile({
       full_name: fullName.trim(),
       home_unit_id: homeUnitId ? Number(homeUnitId) : null,
     });
     setSaving(false);
     if (res.ok) {
-      setStatusMsg({ type: 'success', text: 'Profile successfully updated.' });
+      setStatusMsg({ type: "success", text: "Profile successfully updated." });
       setIsEditing(false);
     } else {
       setStatusMsg({
-        type: 'error',
-        text: res.message || 'Failed to update profile.',
+        type: "error",
+        text: res.message || "Failed to update profile.",
       });
     }
   };
@@ -73,34 +70,36 @@ export default function ProfileEditor({ user }) {
     <section className="panel profile-panel">
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
           gap: 16,
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
           <span className="profile-initial">
-            {user?.full_name ? user.full_name[0].toUpperCase() : 'U'}
+            {user?.full_name ? user.full_name[0].toUpperCase() : "U"}
           </span>
           <div>
             <h2>{user?.full_name}</h2>
             <p className="muted" style={{ margin: 0 }}>
-              {user?.user_type === 'approver'
-                ? 'Campus Approver & Reviewer'
-                : 'Campus Applicant'}{' '}
+              {user?.user_type === "admin"
+                ? "Campus Administrator"
+                : user?.approval_groups?.some((g) => g.can_approve)
+                  ? "Campus Approver & Reviewer"
+                  : "Campus Applicant"}{" "}
               · {user?.email}
             </p>
           </div>
         </div>
         {!isEditing && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
             <span
               className="booking-status status-approved"
-              style={{ fontSize: 11, padding: '6px 12px' }}
+              style={{ fontSize: 11, padding: "6px 12px" }}
             >
-              ● {user?.is_active ? 'Active Account' : 'Inactive'}
+              ● {user?.is_active ? "Active Account" : "Inactive"}
             </span>
             <button className="button secondary" onClick={handleStartEdit}>
               <Edit2 size={15} />
@@ -113,14 +112,14 @@ export default function ProfileEditor({ user }) {
       {statusMsg.text && (
         <p
           className={`notice ${statusMsg.type}`}
-          role={statusMsg.type === 'error' ? 'alert' : 'status'}
+          role={statusMsg.type === "error" ? "alert" : "status"}
         >
           {statusMsg.text}
         </p>
       )}
 
       {isEditing ? (
-        <form onSubmit={handleSave} style={{ display: 'grid', gap: 20 }}>
+        <form onSubmit={handleSave} style={{ display: "grid", gap: 20 }}>
           <div className="form-two-col">
             <label>
               Full Name
@@ -143,8 +142,8 @@ export default function ProfileEditor({ user }) {
                 <option value="">No department assigned</option>
                 {departments.map((dept) => (
                   <option key={dept.unit_id} value={dept.unit_id}>
-                    {dept.unit_name}{' '}
-                    {dept.unit_code ? `(${dept.unit_code})` : ''}
+                    {dept.unit_name}{" "}
+                    {dept.unit_code ? `(${dept.unit_code})` : ""}
                   </option>
                 ))}
               </select>
@@ -156,12 +155,12 @@ export default function ProfileEditor({ user }) {
               Email Address
               <input
                 type="email"
-                value={user?.email || ''}
+                value={user?.email || ""}
                 disabled
                 style={{
-                  background: '#f8f7fa',
-                  color: '#7a7287',
-                  cursor: 'not-allowed',
+                  background: "#f8f7fa",
+                  color: "#7a7287",
+                  cursor: "not-allowed",
                 }}
               />
               <small className="muted">
@@ -174,15 +173,17 @@ export default function ProfileEditor({ user }) {
               <input
                 type="text"
                 value={
-                  user?.user_type === 'approver'
-                    ? 'Approver / Faculty'
-                    : 'Applicant / Student'
+                  user?.user_type === "admin"
+                    ? "Campus Administrator"
+                    : user?.approval_groups?.some((g) => g.can_approve)
+                      ? "Approver / Faculty"
+                      : "Applicant / Student"
                 }
                 disabled
                 style={{
-                  background: '#f8f7fa',
-                  color: '#7a7287',
-                  cursor: 'not-allowed',
+                  background: "#f8f7fa",
+                  color: "#7a7287",
+                  cursor: "not-allowed",
                 }}
               />
               <small className="muted">Assigned during registration.</small>
@@ -199,13 +200,9 @@ export default function ProfileEditor({ user }) {
               <X size={15} />
               Cancel
             </button>
-            <button
-              type="submit"
-              className="button primary"
-              disabled={saving}
-            >
+            <button type="submit" className="button primary" disabled={saving}>
               <Save size={15} />
-              {saving ? 'Saving changes…' : 'Save Changes'}
+              {saving ? "Saving changes…" : "Save Changes"}
             </button>
           </div>
         </form>
@@ -223,17 +220,15 @@ export default function ProfileEditor({ user }) {
           </div>
           <div>
             <dt>Account type</dt>
-            <dd style={{ textTransform: 'capitalize' }}>
-              {user?.user_type}
-            </dd>
+            <dd style={{ textTransform: "capitalize" }}>{user?.user_type}</dd>
           </div>
           <div>
             <dt>Department</dt>
-            <dd>{user?.unit_name || 'Not assigned'}</dd>
+            <dd>{user?.unit_name || "Not assigned"}</dd>
           </div>
           <div>
             <dt>Account status</dt>
-            <dd>{user?.is_active ? 'Active' : 'Inactive'}</dd>
+            <dd>{user?.is_active ? "Active" : "Inactive"}</dd>
           </div>
         </dl>
       )}
@@ -247,8 +242,8 @@ export default function ProfileEditor({ user }) {
             <li key={group.access_id}>
               <strong>{group.group_name}</strong>
               <span>
-                {group.member_role} ·{' '}
-                {group.can_approve ? 'Can review' : 'Member'}
+                {group.member_role} ·{" "}
+                {group.can_approve ? "Can review" : "Member"}
               </span>
             </li>
           ))}

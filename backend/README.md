@@ -1,8 +1,9 @@
 # VenueFlow backend
 
 FastAPI with ordinary parameterized SQL queries using psycopg2. The database is
-your existing Supabase PostgreSQL project. The API does not create or alter tables,
-seed accounts or run migrations.
+your existing Supabase PostgreSQL project. The API does not create tables on startup.
+Run the additive `manage.py setup` explicitly for the new admin workflow.
+See [UPGRADES.md](../UPGRADES.md) for current setup, Redis, SMTP, worker and admin commands.
 
 ## Setup
 
@@ -23,6 +24,7 @@ Edit `backend/.env`:
   password, URL-encode reserved characters in it, and use `sslmode=require`.
 - `JWT_SECRET_KEY`: a random secret of at least 32 characters. Generate one with
   `.venv/Scripts/python -c "import secrets; print(secrets.token_urlsafe(48))"`.
+- `REDIS_URL`: required for login/OTP protection and drafting notices.
 - `CORS_ORIGINS`: frontend origins allowed to call the API directly.
 - SMTP settings: required for email registration. With `SMTP_ENABLED=false`,
   registration and resend return 503 with a configuration message. Existing
@@ -31,6 +33,7 @@ Edit `backend/.env`:
 Start the API:
 
 ```powershell
+.venv/Scripts/python manage.py setup
 .venv/Scripts/python -m uvicorn app.main:app --reload
 ```
 
@@ -103,25 +106,19 @@ Validation errors return 422, authentication 401, permissions 403, missing recor
 
 - Start must be in the future, end after start, and attendance positive and within
   known capacity. All booking writes lock the venue until commit.
-- Pending and confirmed slots block overlaps. Back-to-back slots are allowed.
-  Availability checks do not reserve a slot; creation checks again while saving.
+- Competing requests can overlap pending or confirmed bookings. Only one conflicting request may be confirmed. Explicit reviewer replacement obeys the eight-hour deadline. Admin blackout periods forbid submission and approval.
 - Primary review comes first, then additional configured stages. Groups at the
   same stage can act in either order. Group thresholds are saved at submission.
 - A reviewer must have current active membership with `can_approve=true`.
   Self-review and repeated votes are rejected. A role label alone grants no access.
-- All stages must approve before the application is approved. Rejection and
-  cancellation release the slot. Owners can cancel pending or approved future
-  bookings. Existing decision history is retained.
+- All stages must approve before confirmation. Owners, assigned reviewers and administrators can cancel at least eight hours before the event. Existing history is retained.
 - Application statuses: `submitted`, `approved`, `rejected`, `cancelled`.
   Slot statuses: `pending`, `confirmed`, `cancelled`. The UI labels submitted
   requests as Pending.
 - A venue must have enough eligible reviewers before it can accept a booking.
 - Reapply after rejection with a new request; keep the old decision history.
 
-Administrators assign reviewers in the existing `group_members` table. Public
-registration cannot assign permissions. Account profiles are read-only in this
-simple app; administrators maintain account details. Attachments and stored
-cancellation reasons are outside this schema.
+Administrators approve reviewer requests and maintain permissions in the admin portal. Public registration cannot grant review or admin permissions. Attachments are outside this simple workflow.
 
 ## Verification
 

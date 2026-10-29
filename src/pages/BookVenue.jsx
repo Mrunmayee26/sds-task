@@ -1,87 +1,62 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Clock } from 'lucide-react';
-import PortalLayout from '../layouts/PortalLayout';
-import { DataState, PageHeading } from '../components/BookingUI';
-import { AttendanceNotice, CapacityMeter } from '../components';
-import { useBookingData } from '../hooks/useBookingData';
-import { useAuth } from '../hooks/useAuth';
-import { checkAvailability, createBooking } from '../services/bookingService';
-import { campusTimestamp, dateKey, dateLabel, timeLabel } from '../services/format';
-
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import PortalLayout from "../layouts/PortalLayout";
+import { DataState, PageHeading } from "../components/BookingUI";
+import { useBookingData } from "../hooks/useBookingData";
+import { useAuth } from "../hooks/useAuth";
+import { checkAvailability, createBooking } from "../services/bookingService";
+import { campusTimestamp, dateKey } from "../services/format";
+import { apiRequest } from "../services/apiClient";
+import { useApiData } from "../hooks/useApiData";
+import CapacityMeter from "../components/Booking/CapacityMeter";
+import AttendanceNotice from "../components/Booking/AttendanceNotice";
 export default function BookVenue() {
   const { user, session } = useAuth();
   const navigate = useNavigate();
   const [query] = useSearchParams();
-  const venues = useBookingData('venues');
+  const venues = useBookingData("venues");
+  const advisors = useApiData("auth/faculty-advisors");
   const [form, setForm] = useState({
-    venue_id: query.get('venue') || '',
-    purpose: '',
-    description: '',
-    application_type: 'Academic',
-    expected_attendance: '',
-    date: query.get('date') || '',
-    start_time: query.get('start_time') || query.get('start') || '',
-    end_time: query.get('end_time') || query.get('end') || '',
+    venue_id: query.get("venue") || "",
+    purpose: "",
+    description: "",
+    application_type: "Academic",
+    expected_attendance: "",
+    faculty_advisor_id: "",
+    date: query.get("date") || "",
+    start_time: query.get("start_time") || "",
+    end_time: query.get("end_time") || "",
   });
-
-  useEffect(() => {
-    const qVenue = query.get('venue');
-    const qDate = query.get('date');
-    const qStart = query.get('start_time') || query.get('start');
-    const qEnd = query.get('end_time') || query.get('end');
-
-    if (qVenue || qDate || qStart || qEnd) {
-      setForm((prev) => ({
-        ...prev,
-        ...(qVenue ? { venue_id: qVenue } : {}),
-        ...(qDate ? { date: qDate } : {}),
-        ...(qStart ? { start_time: qStart } : {}),
-        ...(qEnd ? { end_time: qEnd } : {}),
-      }));
-    }
-  }, [query]);
   const [availability, setAvailability] = useState(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const submitLock = useRef(false);
   const selected = venues.data.find(
     (venue) => venue.venue_id === Number(form.venue_id),
   );
-  const attendance = form.expected_attendance
-    ? Number(form.expected_attendance)
+  const attendance = Number(form.expected_attendance);
+  const exceedsCapacity =
+    !!selected?.capacity && attendance > selected.capacity;
+  const nearCapacity =
+    !!selected?.capacity && attendance >= selected.capacity * 0.8;
+  const fillPercentage = selected?.capacity
+    ? Math.min(100, (attendance / selected.capacity) * 100)
     : 0;
-  const exceedsCapacity = Boolean(
-    selected?.capacity && attendance > selected.capacity,
-  );
-  const nearCapacity = Boolean(
-    selected?.capacity &&
-      attendance > selected.capacity * 0.85 &&
-      !exceedsCapacity,
-  );
-  const fillPercentage =
-    selected?.capacity && attendance
-      ? Math.min(100, Math.round((attendance / selected.capacity) * 100))
-      : 0;
-  const suggestedVenues = exceedsCapacity
-    ? venues.data.filter(
-        (v) =>
-          v.venue_id !== selected?.venue_id &&
-          v.is_active !== false &&
-          v.capacity &&
-          v.capacity >= attendance,
-      )
-    : [];
-
+  const capacityProps = {
+    selected,
+    attendance,
+    exceedsCapacity,
+    nearCapacity,
+    fillPercentage,
+  };
   const update = (event) => {
     setForm((previous) => ({
       ...previous,
       [event.target.name]: event.target.value,
     }));
-    setError('');
+    setError("");
   };
   const { venue_id, date, start_time, end_time } = form;
-
   useEffect(() => {
     if (!venue_id || !date || !start_time || !end_time) return;
     const controller = new AbortController();
@@ -96,7 +71,8 @@ export default function BookVenue() {
           if (!controller.signal.aborted)
             setAvailability({
               key: `${venue_id}/${date}/${start_time}/${end_time}`,
-              available: result.available,
+              available: result.can_request,
+              competing: result.competing_requests,
             });
         })
         .catch((failure) => {
@@ -116,35 +92,60 @@ export default function BookVenue() {
     availability?.key === `${venue_id}/${date}/${start_time}/${end_time}`
       ? availability
       : null;
-
+  const [draftNotice, setDraftNotice] = useState("");
+  useEffect(() => {
+    if (
+      !venue_id ||
+      !date ||
+      !start_time ||
+      !end_time ||
+      end_time <= start_time
+    )
+      return;
+    const controller = new AbortController();
+    const update = () =>
+      apiRequest("api/v1/booking-holds", {
+        method: "POST",
+        signal: controller.signal,
+        body: {
+          venue_id: Number(venue_id),
+          start_time: campusTimestamp(date, start_time),
+          end_time: campusTimestamp(date, end_time),
+        },
+      })
+        .then((result) => {
+          if (!controller.signal.aborted)
+            setDraftNotice(result.other_drafts ? result.message : "");
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) setDraftNotice(error.message);
+        });
+    const timer = setTimeout(update, 500);
+    const refresh = setInterval(update, 60000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(refresh);
+      controller.abort();
+    };
+  }, [venue_id, date, start_time, end_time]);
   async function submit(event) {
     event.preventDefault();
     if (submitLock.current) return;
     if (!selected) {
-      setError('Choose an active venue.');
-      return;
-    }
-    if (selected.capacity && Number(form.expected_attendance) > selected.capacity) {
-      setError(
-        `Expected attendance (${form.expected_attendance}) exceeds the maximum capacity of ${selected.venue_name} (${selected.capacity} seats). Please reduce attendance or select a larger venue.`,
-      );
-      return;
-    }
-    if (Number(form.expected_attendance) <= 0) {
-      setError('Expected attendance must be at least 1 person.');
+      setError("Choose an active venue.");
       return;
     }
     if (end_time <= start_time) {
-      setError('End time must be after start time.');
+      setError("End time must be after start time.");
       return;
     }
     if (currentAvailability?.available === false) {
-      setError('This venue is already reserved for that time.');
+      setError("The administrator has marked this venue unavailable.");
       return;
     }
     submitLock.current = true;
     setSubmitting(true);
-    setError('');
+    setError("");
     try {
       const saved = await createBooking({
         venue_id: Number(venue_id),
@@ -152,11 +153,14 @@ export default function BookVenue() {
         description: form.description.trim(),
         application_type: form.application_type,
         expected_attendance: Number(form.expected_attendance),
+        faculty_advisor_id: form.faculty_advisor_id
+          ? Number(form.faculty_advisor_id)
+          : null,
         start_time: campusTimestamp(date, start_time),
         end_time: campusTimestamp(date, end_time),
       });
-      navigate(`/${session?.role || user?.role || 'applicant'}/bookings/${saved.application_id}`, {
-        state: { message: 'Your booking request has been submitted.' },
+      navigate(`/${session.role}/bookings/${saved.application_id}`, {
+        state: { message: "Your booking request has been submitted." },
       });
     } catch (failure) {
       setError(failure.message);
@@ -165,7 +169,6 @@ export default function BookVenue() {
       setSubmitting(false);
     }
   }
-
   return (
     <PortalLayout>
       <PageHeading title="Make room for your next idea.">
@@ -187,31 +190,6 @@ export default function BookVenue() {
                 <h2>Booking details</h2>
                 <span className="muted">All times in IST</span>
               </div>
-              {date && start_time && end_time && (
-                <div
-                  style={{
-                    background: 'linear-gradient(135deg, #f5f2ff 0%, #ede7ff 100%)',
-                    border: '1px solid #d4c4fb',
-                    borderRadius: '10px',
-                    padding: '12px 16px',
-                    marginBottom: '18px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    fontSize: '13px',
-                    color: '#5329b3',
-                  }}
-                >
-                  <Clock size={18} style={{ color: '#7047eb', flexShrink: 0 }} />
-                  <span>
-                    Selected Time Slot:{' '}
-                    <strong>{dateLabel(date)}</strong> from{' '}
-                    <strong>{timeLabel(campusTimestamp(date, start_time))}</strong> to{' '}
-                    <strong>{timeLabel(campusTimestamp(date, end_time))}</strong>.
-                    {!venue_id && ' Select a venue below to check availability.'}
-                  </span>
-                </div>
-              )}
               <label>
                 Venue
                 <select
@@ -224,7 +202,7 @@ export default function BookVenue() {
                   {venues.data.map((venue) => (
                     <option key={venue.venue_id} value={venue.venue_id}>
                       {venue.venue_name}
-                      {venue.capacity ? ` · ${venue.capacity} seats` : ''}
+                      {venue.capacity ? ` · ${venue.capacity} seats` : ""}
                     </option>
                   ))}
                 </select>
@@ -249,71 +227,67 @@ export default function BookVenue() {
                     onChange={update}
                   >
                     {[
-                      'Academic',
-                      'Workshop',
-                      'Seminar',
-                      'Cultural',
-                      'Meeting',
-                      'Other',
+                      "Academic",
+                      "Workshop",
+                      "Seminar",
+                      "Cultural",
+                      "Meeting",
+                      "Other",
                     ].map((type) => (
                       <option key={type}>{type}</option>
                     ))}
                   </select>
                 </label>
                 <label>
-                  <div
-                    style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'baseline',
-                    }}
-                  >
-                    <span>Expected attendance</span>
-                    {selected?.capacity && (
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          color: exceedsCapacity ? '#b02c48' : '#7047eb',
-                        }}
-                      >
-                        Max: {selected.capacity} seats
-                      </span>
-                    )}
-                  </div>
+                  Expected attendance
                   <input
                     type="number"
                     name="expected_attendance"
                     value={form.expected_attendance}
                     onChange={update}
                     min="1"
+                    max={selected?.capacity || undefined}
                     step="1"
                     required
-                    placeholder={
-                      selected?.capacity
-                        ? `Up to ${selected.capacity} attendees`
-                        : 'Number of attendees'
-                    }
-                    style={
-                      exceedsCapacity
-                        ? { borderColor: '#ff4d5b', backgroundColor: '#fff8f9' }
-                        : {}
-                    }
                   />
                 </label>
               </div>
+              <CapacityMeter {...capacityProps} />
               <AttendanceNotice
-                selected={selected}
-                attendance={attendance}
-                exceedsCapacity={exceedsCapacity}
-                nearCapacity={nearCapacity}
-                fillPercentage={fillPercentage}
-                suggestedVenues={suggestedVenues}
-                onSelectVenue={(vId) => {
-                  setForm((prev) => ({ ...prev, venue_id: vId }));
-                  setError('');
-                }}
+                {...capacityProps}
+                suggestedVenues={venues.data
+                  .filter(
+                    (v) =>
+                      v.venue_id !== selected?.venue_id &&
+                      v.capacity >= attendance,
+                  )
+                  .slice(0, 3)}
+                onSelectVenue={(v) =>
+                  setForm((f) => ({ ...f, venue_id: String(v) }))
+                }
               />
+              <DataState {...advisors} />
+              {advisors.data.length > 0 && (
+                <label>
+                  Faculty advisor
+                  <select
+                    name="faculty_advisor_id"
+                    value={form.faculty_advisor_id}
+                    onChange={update}
+                    required
+                  >
+                    <option value="">Select your advisor</option>
+                    {advisors.data
+                      .filter((a) => a.user_id !== user.user_id)
+                      .map((a) => (
+                        <option value={a.user_id} key={a.user_id}>
+                          {a.full_name}
+                          {a.unit_name ? ` — ${a.unit_name}` : ""}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
               <label>
                 Event description
                 <textarea
@@ -358,15 +332,22 @@ export default function BookVenue() {
                   />
                 </label>
               </div>
+              {draftNotice && (
+                <p className="notice warning" role="status">
+                  {draftNotice}
+                </p>
+              )}
               {currentAvailability && (
                 <p
                   role="status"
-                  className={`notice ${currentAvailability.available ? 'success' : 'warning'}`}
+                  className={`notice ${currentAvailability.available ? "success" : "warning"}`}
                 >
                   {currentAvailability.error ||
                     (currentAvailability.available
-                      ? 'Venue is available for this time. Availability is checked again when you submit.'
-                      : 'This venue is reserved for an overlapping time. Choose another slot.')}
+                      ? currentAvailability.competing
+                        ? "An overlapping request already exists. You can submit a competing request; the reviewer decides priority."
+                        : "You can submit a request for this time."
+                      : "The administrator has marked this venue unavailable. Choose another slot.")}
                 </p>
               )}
               {error && (
@@ -375,46 +356,36 @@ export default function BookVenue() {
                 </p>
               )}
               <div className="form-actions">
-                <Link className="button secondary" to="/applicant/venues">
+                <Link
+                  className="button secondary"
+                  to={`/${session.role}/venues`}
+                >
                   Back to venues
                 </Link>
                 <button
                   className="button primary"
                   type="submit"
                   disabled={
-                    submitting ||
-                    currentAvailability?.available === false ||
-                    exceedsCapacity
+                    submitting || currentAvailability?.available === false
                   }
                 >
-                  {submitting
-                    ? 'Submitting…'
-                    : exceedsCapacity
-                      ? 'Exceeds venue capacity'
-                      : 'Submit request'}
+                  {submitting ? "Submitting…" : "Submit request"}
                 </button>
               </div>
             </form>
             <aside className="panel booking-aside">
               <p className="eyebrow">YOUR RESERVATION</p>
-              <h2>{selected?.venue_name || 'Choose your venue'}</h2>
+              <h2>{selected?.venue_name || "Choose your venue"}</h2>
               <p className="muted">
-                {selected?.building_name || 'Explore spaces across the campus.'}
+                {selected?.building_name || "Explore spaces across the campus."}
               </p>
               {selected && (
                 <>
                   <p>
                     {selected.capacity
-                      ? `${selected.capacity} seats capacity`
-                      : 'Capacity not specified'}
+                      ? `${selected.capacity} seats`
+                      : "Capacity not specified"}
                   </p>
-                  <CapacityMeter
-                    selected={selected}
-                    attendance={attendance}
-                    exceedsCapacity={exceedsCapacity}
-                    nearCapacity={nearCapacity}
-                    fillPercentage={fillPercentage}
-                  />
                   <hr />
                   <p className="eyebrow">REVIEWED BY</p>
                   <p>{selected.primary_approval_group}</p>
@@ -427,8 +398,8 @@ export default function BookVenue() {
               <hr />
               <h3>What happens next?</h3>
               <p className="muted">
-                Your selected time is reserved while reviewers consider your
-                request. Track its progress in My bookings.
+                Competing requests are allowed. Reviewers decide which request
+                gets the time slot. Track your request in My bookings.
               </p>
             </aside>
           </div>

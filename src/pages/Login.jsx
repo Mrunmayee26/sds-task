@@ -14,11 +14,11 @@ import { useAuth } from '../hooks/useAuth';
 import { AuthBrandPanel } from '../components';
 import styles from './Login.module.css';
 
-export default function Login() {
+export default function Login({ admin = false }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { session: currentSession } = useAuth();
-  const [role, setRole] = useState('applicant');
+  const [role, setRole] = useState(admin ? 'admin' : 'applicant');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -51,8 +51,7 @@ export default function Login() {
       setPassword('');
       const requestedPath = location.state?.from;
       const authenticatedRole = result.user.role;
-      const rolePrefix =
-        authenticatedRole === 'approver' ? '/approver' : '/applicant';
+      const rolePrefix = `/${authenticatedRole}`;
       navigate(
         typeof requestedPath === 'string' &&
           requestedPath.startsWith(`${rolePrefix}/`)
@@ -74,7 +73,9 @@ export default function Login() {
       <section className={styles.formPanel} aria-labelledby="login-title">
         <div className={styles.formContent}>
           <p className={styles.welcomeLabel}>WELCOME BACK</p>
-          <h2 id="login-title">Sign in to VenueFlow</h2>
+          <h2 id="login-title">
+            {admin ? 'Administrator sign in' : 'Sign in to VenueFlow'}
+          </h2>
           <p className={styles.formSubtitle}>
             Sign in with your official university credentials.
           </p>
@@ -131,55 +132,57 @@ export default function Login() {
               </div>
             </div>
 
-            <fieldset className={styles.roleFieldset}>
-              <legend>Sign in as</legend>
-              <div className={styles.roleOptions}>
-                <label
-                  className={`${styles.roleCard} ${role === 'applicant' ? styles.roleCardSelected : ''}`}
-                >
-                  <input
-                    className={styles.roleRadio}
-                    type="radio"
-                    name="role"
-                    value="applicant"
-                    checked={role === 'applicant'}
-                    onChange={() => {
-                      setRole('applicant');
-                      setError('');
-                    }}
-                  />
-                  <span className={styles.roleIcon}>
-                    <UserRound size={18} aria-hidden="true" />
-                  </span>
-                  <span className={styles.roleCopy}>
-                    <strong>Applicant</strong>
-                    <small>Book spaces</small>
-                  </span>
-                </label>
-                <label
-                  className={`${styles.roleCard} ${role === 'approver' ? styles.roleCardSelected : ''}`}
-                >
-                  <input
-                    className={styles.roleRadio}
-                    type="radio"
-                    name="role"
-                    value="approver"
-                    checked={role === 'approver'}
-                    onChange={() => {
-                      setRole('approver');
-                      setError('');
-                    }}
-                  />
-                  <span className={styles.roleIcon}>
-                    <BadgeCheck size={18} aria-hidden="true" />
-                  </span>
-                  <span className={styles.roleCopy}>
-                    <strong>Approver</strong>
-                    <small>Review requests</small>
-                  </span>
-                </label>
-              </div>
-            </fieldset>
+            {!admin && (
+              <fieldset className={styles.roleFieldset}>
+                <legend>Sign in as</legend>
+                <div className={styles.roleOptions}>
+                  <label
+                    className={`${styles.roleCard} ${role === 'applicant' ? styles.roleCardSelected : ''}`}
+                  >
+                    <input
+                      className={styles.roleRadio}
+                      type="radio"
+                      name="role"
+                      value="applicant"
+                      checked={role === 'applicant'}
+                      onChange={() => {
+                        setRole('applicant');
+                        setError('');
+                      }}
+                    />
+                    <span className={styles.roleIcon}>
+                      <UserRound size={18} aria-hidden="true" />
+                    </span>
+                    <span className={styles.roleCopy}>
+                      <strong>Applicant</strong>
+                      <small>Book spaces</small>
+                    </span>
+                  </label>
+                  <label
+                    className={`${styles.roleCard} ${role === 'approver' ? styles.roleCardSelected : ''}`}
+                  >
+                    <input
+                      className={styles.roleRadio}
+                      type="radio"
+                      name="role"
+                      value="approver"
+                      checked={role === 'approver'}
+                      onChange={() => {
+                        setRole('approver');
+                        setError('');
+                      }}
+                    />
+                    <span className={styles.roleIcon}>
+                      <BadgeCheck size={18} aria-hidden="true" />
+                    </span>
+                    <span className={styles.roleCopy}>
+                      <strong>Approver</strong>
+                      <small>Review requests</small>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
+            )}
 
             {error && (
               <p className={styles.error} id="login-error" role="alert">
@@ -198,9 +201,19 @@ export default function Login() {
           </form>
 
           <p className={styles.createAccount}>
+            <Link to="/forgot-password" className={styles.textLink}>
+              Forgot password?
+            </Link>
+          </p>
+          <p className={styles.createAccount}>
             New to VenueFlow?{' '}
             <Link to="/register" className={styles.textLink}>
               Create an account
+            </Link>
+          </p>
+          <p className={styles.createAccount}>
+            <Link to={admin ? '/' : '/admin/login'} className={styles.textLink}>
+              {admin ? 'Applicant / reviewer sign in' : 'Administrator sign in'}
             </Link>
           </p>
         </div>

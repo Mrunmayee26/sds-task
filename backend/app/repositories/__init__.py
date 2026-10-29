@@ -1,6 +1,7 @@
 """
 Repositories package for direct database access.
 """
+
 from .user_repo import (
     get_user_by_email,
     get_user_by_id,

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getBookings, getVenues } from '../services/bookingService';
 
-export function useBookingData(kind, scope = 'mine') {
+export function useBookingData(kind, scope = 'mine', query = '') {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -12,8 +12,8 @@ export function useBookingData(kind, scope = 'mine') {
     const controller = new AbortController();
     const request =
       kind === 'venues'
-        ? getVenues(controller.signal)
-        : getBookings(scope, controller.signal);
+        ? getVenues(controller.signal, query)
+        : getBookings(scope, controller.signal, query);
     request
       .then((rows) => {
         if (!controller.signal.aborted) {
@@ -28,7 +28,7 @@ export function useBookingData(kind, scope = 'mine') {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [kind, scope, version]);
+  }, [kind, scope, version, query]);
 
   useEffect(() => {
     window.addEventListener('venueflow_bookings_changed', refresh);
