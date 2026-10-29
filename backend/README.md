@@ -29,6 +29,11 @@ Edit `backend/.env`:
 - SMTP settings: required for email registration. With `SMTP_ENABLED=false`,
   registration and resend return 503 with a configuration message. Existing
   users can still log in. Verification codes are not logged.
+- Password recovery also requires working SMTP and `FRONTEND_URL` set to the
+  public frontend URL on the deployed backend, for example `https://venues.example.edu`.
+  Keep the frontend's `/reset-password` route accessible through the hosting
+  provider's SPA fallback. SMTP port 587 uses STARTTLS; port 465 uses implicit TLS.
+  A delivery failure now returns 503 and removes the undelivered reset token.
 
 Start the API:
 

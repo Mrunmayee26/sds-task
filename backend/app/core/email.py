@@ -11,6 +11,19 @@ from app.config import settings
 logger = logging.getLogger("venueflow.email")
 
 
+def smtp_options():
+    # Port 465 encrypts immediately; port 587 upgrades with STARTTLS.
+    implicit_tls = settings.SMTP_PORT == 465
+    return {
+        "hostname": settings.SMTP_HOST,
+        "port": settings.SMTP_PORT,
+        "username": settings.SMTP_USER or None,
+        "password": settings.SMTP_PASSWORD or None,
+        "use_tls": implicit_tls,
+        "start_tls": settings.SMTP_USE_TLS and not implicit_tls,
+    }
+
+
 async def send_message(email, subject, body):
     if not settings.SMTP_ENABLED:
         return False
@@ -22,11 +35,7 @@ async def send_message(email, subject, body):
     try:
         await aiosmtplib.send(
             message,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USER,
-            password=settings.SMTP_PASSWORD,
-            start_tls=settings.SMTP_USE_TLS,
+            **smtp_options(),
             timeout=15,
         )
         return True
@@ -93,11 +102,7 @@ async def send_otp_email(to_email: str, otp_code: str, user_name: str = "") -> b
 
         await aiosmtplib.send(
             msg,
-            hostname=settings.SMTP_HOST,
-            port=settings.SMTP_PORT,
-            username=settings.SMTP_USER,
-            password=settings.SMTP_PASSWORD,
-            start_tls=settings.SMTP_USE_TLS,
+            **smtp_options(),
             timeout=10,
         )
         logger.info(f"Verification email sent to {to_email}")

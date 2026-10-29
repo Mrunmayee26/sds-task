@@ -1,6 +1,7 @@
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit, urlunsplit, urlencode
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr, Field
 from app.config import settings
@@ -21,6 +22,37 @@ class Reset(BaseModel):
     password: str = Field(min_length=6, max_length=72)
 
 
+def recovery_url(token):
+    """Use the configured public frontend, never an untrusted request Host header."""
+    try:
+        frontend = urlsplit(settings.FRONTEND_URL.strip())
+        frontend.port  # Validate malformed ports as well as the host.
+    except ValueError as error:
+        raise HTTPException(
+            503, "Password recovery website URL is not configured correctly."
+        ) from error
+    if (
+        frontend.scheme not in ("http", "https")
+        or not frontend.hostname
+        or frontend.username
+        or frontend.password
+        or frontend.query
+        or frontend.fragment
+    ):
+        raise HTTPException(
+            503, "Password recovery website URL is not configured correctly."
+        )
+    return urlunsplit(
+        (
+            frontend.scheme,
+            frontend.netloc,
+            frontend.path.rstrip("/") + "/reset-password",
+            urlencode({"token": token}),
+            "",
+        )
+    )
+
+
 @router.post("/forgot-password")
 async def forgot(data: Forgot):
     email = str(data.email).lower()
@@ -28,6 +60,8 @@ async def forgot(data: Forgot):
     if not settings.SMTP_ENABLED:
         raise HTTPException(503, "Password recovery email is not configured.")
     token = secrets.token_urlsafe(32)
+    link = recovery_url(token)
+    digest = hashlib.sha256(token.encode()).hexdigest()
     with get_db_cursor() as cur:
         cur.execute(
             "SELECT user_id FROM users WHERE lower(email)=%s AND is_active", (email,)
@@ -38,16 +72,26 @@ async def forgot(data: Forgot):
                 """INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES(%s,%s,%s)""",
                 (
                     user["user_id"],
-                    hashlib.sha256(token.encode()).hexdigest(),
+                    digest,
                     datetime.now(timezone.utc) + timedelta(minutes=30),
                 ),
             )
     if user:
-        await send_message(
+        delivered = await send_message(
             email,
             "Reset your VenueFlow password",
-            f"Open {settings.FRONTEND_URL}/reset-password?token={token}\nThis single-use link expires in 30 minutes.",
+            f"Open {link}\nThis single-use link expires in 30 minutes.",
         )
+        if not delivered:
+            # A failed delivery must not leave a usable token or claim success.
+            with get_db_cursor() as cur:
+                cur.execute(
+                    "DELETE FROM password_resets WHERE token_hash=%s", (digest,)
+                )
+            raise HTTPException(
+                503,
+                "Recovery email could not be delivered. Please try again later or contact the administrator.",
+            )
     return {"message": "If an active account exists, a recovery email will be sent."}
 
 
