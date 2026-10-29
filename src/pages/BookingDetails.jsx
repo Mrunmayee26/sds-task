@@ -9,7 +9,6 @@ import {
   getBooking,
 } from '../services/bookingService';
 import { dateLabel, timeLabel } from '../services/format';
-
 export default function BookingDetails() {
   const { bookingId } = useParams();
   const { user, session } = useAuth();
@@ -19,12 +18,12 @@ export default function BookingDetails() {
   const [actionError, setActionError] = useState('');
   const [message, setMessage] = useState(location.state?.message || '');
   const [remarks, setRemarks] = useState('');
+  const [replaceConflicts, setReplaceConflicts] = useState(false);
   const [busy, setBusy] = useState(false);
   const lock = useRef(false);
   const [version, setVersion] = useState(0);
   const [now, setNow] = useState(Date.now);
   const refresh = useCallback(() => setVersion((value) => value + 1), []);
-
   useEffect(() => {
     const controller = new AbortController();
     getBooking(bookingId, controller.signal)
@@ -49,7 +48,6 @@ export default function BookingDetails() {
       window.removeEventListener('focus', refresh);
     };
   }, [refresh]);
-
   async function act(action) {
     if (lock.current) return;
     lock.current = true;
@@ -60,7 +58,7 @@ export default function BookingDetails() {
       const saved =
         action === 'cancelled'
           ? await cancelBooking(bookingId)
-          : await decideBooking(bookingId, action, remarks);
+          : await decideBooking(bookingId, action, remarks, replaceConflicts);
       setBooking(saved);
       setRemarks('');
       setMessage(
@@ -78,7 +76,6 @@ export default function BookingDetails() {
       setBusy(false);
     }
   }
-
   const isOwner = booking?.applicant_user_id === user.user_id;
   const pending =
     booking?.approvals.filter((approval) => approval.status === 'pending') ||
@@ -105,7 +102,6 @@ export default function BookingDetails() {
   const future =
     booking?.slots.length &&
     booking.slots.every((slot) => new Date(slot.start_time).getTime() > now);
-
   return (
     <PortalLayout>
       <PageHeading
@@ -113,7 +109,7 @@ export default function BookingDetails() {
         action={
           <Link
             className="button secondary"
-            to={`/${session.role}/${session.role === 'approver' ? 'approvals' : 'applications'}`}
+            to={`/${session.role}/${session.role === 'admin' ? 'bookings' : session.role === 'approver' ? 'approvals' : 'applications'}`}
           >
             Back to requests
           </Link>
@@ -206,18 +202,20 @@ export default function BookingDetails() {
               {actionError}
             </p>
           )}
-          {isOwner &&
+          {(isOwner ||
+            session.role === 'approver' ||
+            session.role === 'admin') &&
             ['submitted', 'approved'].includes(booking.status) &&
             future && (
               <section className="panel detail-panel">
                 <h2>Change of plans?</h2>
                 <p className="muted">
-                  Cancelling releases the venue for other applicants. This
-                  cannot be undone.
+                  Cancellation closes eight hours before the event. This cannot
+                  be undone.
                 </p>
                 <button
                   className="button danger"
-                  disabled={busy}
+                  disabled={busy || !booking.can_cancel}
                   onClick={() => {
                     if (
                       window.confirm(
@@ -245,6 +243,16 @@ export default function BookingDetails() {
                       rows={3}
                       placeholder="Add a note for the applicant"
                     />
+                  </label>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={replaceConflicts}
+                      onChange={(e) => setReplaceConflicts(e.target.checked)}
+                      style={{ width: 20 }}
+                    />
+                    Give this request priority and cancel conflicting approved
+                    bookings (eight-hour deadline applies)
                   </label>
                   <div className="form-actions">
                     <button

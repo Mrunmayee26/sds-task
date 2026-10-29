@@ -1,6 +1,7 @@
 """
 Email service using aiosmtplib for sending verification OTPs and transactional notifications.
 """
+
 import logging
 from html import escape
 from email.message import EmailMessage
@@ -8,6 +9,31 @@ import aiosmtplib
 from app.config import settings
 
 logger = logging.getLogger("venueflow.email")
+
+
+async def send_message(email, subject, body):
+    if not settings.SMTP_ENABLED:
+        return False
+    message = EmailMessage()
+    message["To"] = email
+    message["From"] = settings.SMTP_FROM_EMAIL
+    message["Subject"] = subject
+    message.set_content(body)
+    try:
+        await aiosmtplib.send(
+            message,
+            hostname=settings.SMTP_HOST,
+            port=settings.SMTP_PORT,
+            username=settings.SMTP_USER,
+            password=settings.SMTP_PASSWORD,
+            start_tls=settings.SMTP_USE_TLS,
+            timeout=15,
+        )
+        return True
+    except Exception:
+        logger.exception("Email delivery failed")
+        return False
+
 
 def create_otp_html(user_name: str, otp_code: str) -> str:
     """Generate clean HTML email template for verification OTP."""
@@ -44,6 +70,7 @@ def create_otp_html(user_name: str, otp_code: str) -> str:
     </html>
     """
 
+
 async def send_otp_email(to_email: str, otp_code: str, user_name: str = "") -> bool:
     """
     Send OTP verification email via SMTP.
@@ -59,7 +86,9 @@ async def send_otp_email(to_email: str, otp_code: str, user_name: str = "") -> b
         msg["To"] = to_email
 
         html_content = create_otp_html(user_name, otp_code)
-        msg.set_content(f"Your COEP VenueFlow verification code is: {otp_code}\nValid for 10 minutes.")
+        msg.set_content(
+            f"Your COEP VenueFlow verification code is: {otp_code}\nValid for 10 minutes."
+        )
         msg.add_alternative(html_content, subtype="html")
 
         await aiosmtplib.send(

@@ -5,7 +5,7 @@ const TOKEN_KEY = 'venueflow_auth_token_v1';
 export const canApprove = (user) =>
   user?.approval_groups?.some((group) => group.can_approve);
 export const dashboardForRole = (role) =>
-  `/${role === 'approver' ? 'approver' : 'applicant'}/dashboard`;
+  `/${['approver', 'admin'].includes(role) ? role : 'applicant'}/dashboard`;
 
 export function getSession() {
   try {

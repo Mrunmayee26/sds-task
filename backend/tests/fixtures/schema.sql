@@ -18,7 +18,7 @@ CREATE TABLE users (
 CREATE TABLE approval_groups (
     access_id SERIAL PRIMARY KEY, group_name VARCHAR(150) NOT NULL,
     unit_id INTEGER NOT NULL REFERENCES organizational_units,
-    approval_mode VARCHAR(20) NOT NULL DEFAULT 'any' CHECK (approval_mode IN ('any', 'all')),
+    approval_mode VARCHAR(20) NOT NULL DEFAULT 'any' CHECK (LOWER(approval_mode) IN ('any', 'all','minimum')),
     minimum_approvals INTEGER NOT NULL DEFAULT 1 CHECK (minimum_approvals > 0),
     is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
@@ -45,6 +45,7 @@ CREATE TABLE applications (
     venue_id INTEGER REFERENCES venues, target_access_id INTEGER REFERENCES approval_groups,
     application_type VARCHAR(40) NOT NULL, purpose VARCHAR(255) NOT NULL,
     description TEXT,
+    faculty_advisor_id INTEGER REFERENCES users,
     status VARCHAR(30) NOT NULL DEFAULT 'draft'
         CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), submitted_at TIMESTAMPTZ

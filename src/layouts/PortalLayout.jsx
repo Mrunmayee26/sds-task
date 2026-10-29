@@ -29,7 +29,23 @@ export default function PortalLayout({ children }) {
     ],
     ['schedule', 'Schedule', CalendarDays],
     ['settings', 'My profile', UserRound],
+    ['notifications', 'Notifications', ClipboardList],
+    ['access', 'Request reviewer access', UserRound],
   ];
+  const navigation =
+    role === 'admin'
+      ? [
+          ['dashboard', 'Overview', LayoutDashboard],
+          ['users', 'Users & permissions', UserRound],
+          ['requests', 'Reviewer requests', ClipboardList],
+          ['venues', 'Manage venues', Building2],
+          ['blackouts', 'Unavailable periods', CalendarDays],
+          ['bookings', 'All bookings', CalendarDays],
+          ['audit', 'Audit trail', ClipboardList],
+          ['operations', 'Service health', LayoutDashboard],
+          ['settings', 'My profile', UserRound],
+        ]
+      : links;
   const changePortal = () => {
     const next = reviewer ? 'applicant' : 'approver';
     switchPortal(next);
@@ -48,10 +64,14 @@ export default function PortalLayout({ children }) {
           </span>
         </NavLink>
         <p className="portal-nav-label">
-          {reviewer ? 'APPROVER WORKSPACE' : 'APPLICANT WORKSPACE'}
+          {role === 'admin'
+            ? 'ADMINISTRATOR'
+            : reviewer
+              ? 'APPROVER WORKSPACE'
+              : 'APPLICANT WORKSPACE'}
         </p>
         <nav aria-label="Main navigation">
-          {links.map(([path, label, Icon]) => (
+          {navigation.map(([path, label, Icon]) => (
             <NavLink
               key={path}
               to={`/${role}/${path}`}
@@ -85,7 +105,14 @@ export default function PortalLayout({ children }) {
       </aside>
       <div className="portal-main">
         <header className="portal-topbar">
-          <span>{reviewer ? 'Approver' : 'Applicant'} portal</span>
+          <span>
+            {role === 'admin'
+              ? 'Administrator'
+              : reviewer
+                ? 'Approver'
+                : 'Applicant'}{' '}
+            portal
+          </span>
           <NavLink to={`/${role}/settings`}>
             <span className="portal-avatar">
               {user.full_name.slice(0, 1).toUpperCase()}

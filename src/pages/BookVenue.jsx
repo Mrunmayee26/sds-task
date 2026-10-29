@@ -6,7 +6,7 @@ import { useBookingData } from '../hooks/useBookingData';
 import { useAuth } from '../hooks/useAuth';
 import { checkAvailability, createBooking } from '../services/bookingService';
 import { campusTimestamp, dateKey } from '../services/format';
-
+import { apiRequest } from '../services/apiClient';
 export default function BookVenue() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -37,7 +37,6 @@ export default function BookVenue() {
     setError('');
   };
   const { venue_id, date, start_time, end_time } = form;
-
   useEffect(() => {
     if (!venue_id || !date || !start_time || !end_time) return;
     const controller = new AbortController();
@@ -52,7 +51,8 @@ export default function BookVenue() {
           if (!controller.signal.aborted)
             setAvailability({
               key: `${venue_id}/${date}/${start_time}/${end_time}`,
-              available: result.available,
+              available: result.can_request,
+              competing: result.competing_requests,
             });
         })
         .catch((failure) => {
@@ -72,7 +72,42 @@ export default function BookVenue() {
     availability?.key === `${venue_id}/${date}/${start_time}/${end_time}`
       ? availability
       : null;
-
+  const [draftNotice, setDraftNotice] = useState('');
+  useEffect(() => {
+    if (
+      !venue_id ||
+      !date ||
+      !start_time ||
+      !end_time ||
+      end_time <= start_time
+    )
+      return;
+    const controller = new AbortController();
+    const update = () =>
+      apiRequest('api/v1/booking-holds', {
+        method: 'POST',
+        signal: controller.signal,
+        body: {
+          venue_id: Number(venue_id),
+          start_time: campusTimestamp(date, start_time),
+          end_time: campusTimestamp(date, end_time),
+        },
+      })
+        .then((result) => {
+          if (!controller.signal.aborted)
+            setDraftNotice(result.other_drafts ? result.message : '');
+        })
+        .catch((error) => {
+          if (!controller.signal.aborted) setDraftNotice(error.message);
+        });
+    const timer = setTimeout(update, 500);
+    const refresh = setInterval(update, 60000);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(refresh);
+      controller.abort();
+    };
+  }, [venue_id, date, start_time, end_time]);
   async function submit(event) {
     event.preventDefault();
     if (submitLock.current) return;
@@ -85,7 +120,7 @@ export default function BookVenue() {
       return;
     }
     if (currentAvailability?.available === false) {
-      setError('This venue is already reserved for that time.');
+      setError('The administrator has marked this venue unavailable.');
       return;
     }
     submitLock.current = true;
@@ -111,7 +146,6 @@ export default function BookVenue() {
       setSubmitting(false);
     }
   }
-
   return (
     <PortalLayout>
       <PageHeading title="Make room for your next idea.">
@@ -239,6 +273,11 @@ export default function BookVenue() {
                   />
                 </label>
               </div>
+              {draftNotice && (
+                <p className="notice warning" role="status">
+                  {draftNotice}
+                </p>
+              )}
               {currentAvailability && (
                 <p
                   role="status"
@@ -246,8 +285,10 @@ export default function BookVenue() {
                 >
                   {currentAvailability.error ||
                     (currentAvailability.available
-                      ? 'Venue is available for this time. Availability is checked again when you submit.'
-                      : 'This venue is reserved for an overlapping time. Choose another slot.')}
+                      ? currentAvailability.competing
+                        ? 'An overlapping request already exists. You can submit a competing request; the reviewer decides priority.'
+                        : 'You can submit a request for this time.'
+                      : 'The administrator has marked this venue unavailable. Choose another slot.')}
                 </p>
               )}
               {error && (
@@ -295,8 +336,8 @@ export default function BookVenue() {
               <hr />
               <h3>What happens next?</h3>
               <p className="muted">
-                Your selected time is reserved while reviewers consider your
-                request. Track its progress in My bookings.
+                Competing requests are allowed. Reviewers decide which request
+                gets the time slot. Track your request in My bookings.
               </p>
             </aside>
           </div>

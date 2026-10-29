@@ -20,6 +20,8 @@ import {
 import BookVenue from './pages/BookVenue';
 import BookingDetails from './pages/BookingDetails';
 import './layouts/Portal.css';
+import AdminPage from './pages/AdminPages';
+import { Recovery, AccessRequests, Notifications } from './pages/AccountExtras';
 
 function ProtectedRoute({ role, children }) {
   const { session, loading, error, retry } = useAuth();
@@ -62,8 +64,67 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Login />} />
           <Route path="/register" element={<CreateAccount />} />
+          <Route path="/admin/login" element={<Login admin />} />
+          <Route path="/forgot-password" element={<Recovery />} />
+          <Route path="/reset-password" element={<Recovery reset />} />
+          {[
+            'dashboard',
+            'users',
+            'requests',
+            'venues',
+            'blackouts',
+            'bookings',
+            'audit',
+            'operations',
+          ].map((section) => (
+            <Route
+              key={section}
+              path={`/admin/${section}`}
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminPage section={section} key={section} />
+                </ProtectedRoute>
+              }
+            />
+          ))}
+          <Route
+            path="/admin"
+            element={<Navigate to="/admin/dashboard" replace />}
+          />
+          <Route
+            path="/admin/settings"
+            element={
+              <ProtectedRoute role="admin">
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/bookings/:bookingId"
+            element={
+              <ProtectedRoute role="admin">
+                <BookingDetails />
+              </ProtectedRoute>
+            }
+          />
           {['applicant', 'approver'].map((role) => (
             <Route key={role} path={`/${role}`}>
+              <Route
+                path="access"
+                element={
+                  <ProtectedRoute role={role}>
+                    <AccessRequests />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="notifications"
+                element={
+                  <ProtectedRoute role={role}>
+                    <Notifications />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 index
                 element={

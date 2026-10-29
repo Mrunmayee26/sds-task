@@ -8,3 +8,5 @@ aiosmtplib>=3.0.2
 pyjwt>=2.9.0
 bcrypt>=4.0.1
 email-validator>=2.2.0
+redis>=5.2,<7
+tzdata>=2024.2
