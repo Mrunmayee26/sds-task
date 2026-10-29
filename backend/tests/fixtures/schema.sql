@@ -47,7 +47,7 @@ CREATE TABLE applications (
     description TEXT,
     faculty_advisor_id INTEGER REFERENCES users,
     status VARCHAR(30) NOT NULL DEFAULT 'draft'
-        CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled')),
+        CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'cancelled', 'needs_reassignment')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), submitted_at TIMESTAMPTZ
 );
 CREATE TABLE booking_slots (

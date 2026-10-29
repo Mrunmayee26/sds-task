@@ -10,6 +10,7 @@ from .auth import (
     RegisterInitResponse,
     VerifyOtpRequest,
     ResendOtpRequest,
+    UserDepartmentBrief,
 )
 
 __all__ = [
@@ -21,4 +22,5 @@ __all__ = [
     "RegisterInitResponse",
     "VerifyOtpRequest",
     "ResendOtpRequest",
+    "UserDepartmentBrief",
 ]

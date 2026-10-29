@@ -1,41 +1,43 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import {
   ArrowRight,
   Building2,
   CalendarPlus,
   MapPin,
   Users,
-} from 'lucide-react';
-import PortalLayout from '../layouts/PortalLayout';
-import { useAuth } from '../hooks/useAuth';
-import { useBookingData } from '../hooks/useBookingData';
-import { BookingTable, DataState, PageHeading } from '../components/BookingUI';
-import { dateKey, campusTimestamp } from '../services/format';
-import { useApiData } from '../hooks/useApiData';
+} from "lucide-react";
+import PortalLayout from "../layouts/PortalLayout";
+import { useAuth } from "../hooks/useAuth";
+import { useBookingData } from "../hooks/useBookingData";
+import { BookingTable, DataState, PageHeading } from "../components/BookingUI";
+import { dateKey, campusTimestamp } from "../services/format";
+import { useApiData } from "../hooks/useApiData";
+import ProfileEditor from "../components/Profile/ProfileEditor";
+import WeeklyCalendar from "../components/Calendar/WeeklyCalendar";
 export function Dashboard() {
   const { session, user } = useAuth();
-  const reviewer = session.role === 'approver';
-  const result = useBookingData('bookings', reviewer ? 'review' : 'mine');
+  const reviewer = session.role === "approver";
+  const result = useBookingData("bookings", reviewer ? "review" : "mine");
   const summary = useApiData(
-    `bookings/summary?scope=${reviewer ? 'review' : 'mine'}`,
+    `bookings/summary?scope=${reviewer ? "review" : "mine"}`,
   );
   const stats = [
-    ['Pending review', summary.data.pending || 0],
-    ['Approved', summary.data.approved || 0],
-    ['Upcoming approved', summary.data.upcoming || 0],
-    ['Total bookings', summary.data.total || 0],
+    ["Pending review", summary.data.pending || 0],
+    ["Approved", summary.data.approved || 0],
+    ["Upcoming approved", summary.data.upcoming || 0],
+    ["Total bookings", summary.data.total || 0],
   ];
   return (
     <PortalLayout>
       <PageHeading
-        title={`Welcome, ${user.full_name.split(' ')[0]}.`}
+        title={`Welcome, ${user.full_name.split(" ")[0]}.`}
         action={
           <Link
             className="button primary"
-            to={reviewer ? '/approver/approvals' : '/applicant/book'}
+            to={reviewer ? "/approver/approvals" : "/applicant/book"}
           >
-            {reviewer ? 'Review requests' : 'Book a venue'}
+            {reviewer ? "Review requests" : "Book a venue"}
             <ArrowRight size={17} />
           </Link>
         }
@@ -61,7 +63,7 @@ export function Dashboard() {
               </div>
               <Link
                 className="text-link"
-                to={`/${session.role}/${reviewer ? 'approvals' : 'applications'}`}
+                to={`/${session.role}/${reviewer ? "approvals" : "applications"}`}
               >
                 View all →
               </Link>
@@ -78,20 +80,20 @@ export function Dashboard() {
 }
 export function Venues() {
   const { session } = useAuth();
-  const [availabilityQuery, setAvailabilityQuery] = useState('');
-  const result = useBookingData('venues', 'mine', availabilityQuery);
-  const [search, setSearch] = useState('');
-  const [type, setType] = useState('');
-  const [capacity, setCapacity] = useState('');
-  const [location, setLocation] = useState('');
-  const [amenity, setAmenity] = useState('');
+  const [availabilityQuery, setAvailabilityQuery] = useState("");
+  const result = useBookingData("venues", "mine", availabilityQuery);
+  const [search, setSearch] = useState("");
+  const [type, setType] = useState("");
+  const [capacity, setCapacity] = useState("");
+  const [location, setLocation] = useState("");
+  const [amenity, setAmenity] = useState("");
   const types = [
     ...new Set(result.data.map((venue) => venue.venue_type)),
   ].sort();
   const venues = result.data.filter(
     (venue) =>
       (!location ||
-        `${venue.building_name || ''} ${venue.location_description || ''}`
+        `${venue.building_name || ""} ${venue.location_description || ""}`
           .toLowerCase()
           .includes(location.toLowerCase())) &&
       (!amenity ||
@@ -125,7 +127,7 @@ export function Venues() {
             <option value="">All types</option>
             {types.map((value) => (
               <option key={value} value={value}>
-                {value.replaceAll('_', ' ')}
+                {value.replaceAll("_", " ")}
               </option>
             ))}
           </select>
@@ -166,8 +168,8 @@ export function Venues() {
           const data = new FormData(e.currentTarget);
           setAvailabilityQuery(
             new URLSearchParams({
-              start_time: campusTimestamp(data.get('date'), data.get('start')),
-              end_time: campusTimestamp(data.get('date'), data.get('end')),
+              start_time: campusTimestamp(data.get("date"), data.get("start")),
+              end_time: campusTimestamp(data.get("date"), data.get("end")),
             }).toString(),
           );
         }}
@@ -188,7 +190,7 @@ export function Venues() {
         <button
           type="button"
           className="button secondary"
-          onClick={() => setAvailabilityQuery('')}
+          onClick={() => setAvailabilityQuery("")}
         >
           Clear time filter
         </button>
@@ -204,7 +206,7 @@ export function Venues() {
               <article className="venue-card" key={venue.venue_id}>
                 <div className="venue-art">
                   <Building2 size={38} />
-                  <span>{venue.venue_type.replaceAll('_', ' ')}</span>
+                  <span>{venue.venue_type.replaceAll("_", " ")}</span>
                 </div>
                 <div className="venue-body">
                   <p className="eyebrow">{venue.unit_name}</p>
@@ -213,13 +215,13 @@ export function Venues() {
                     <MapPin size={16} />
                     {venue.building_name ||
                       venue.location_description ||
-                      'Location not specified'}
+                      "Location not specified"}
                   </p>
                   <p className="venue-meta">
                     <Users size={16} />
                     {venue.capacity
                       ? `${venue.capacity} seats`
-                      : 'Capacity not specified'}
+                      : "Capacity not specified"}
                   </p>
                   {venue.location_description && (
                     <p className="muted">{venue.location_description}</p>
@@ -228,9 +230,9 @@ export function Venues() {
                     Reviewed by {venue.primary_approval_group}
                   </p>
                   {venue.amenities.length > 0 && (
-                    <p className="muted">{venue.amenities.join(' · ')}</p>
+                    <p className="muted">{venue.amenities.join(" · ")}</p>
                   )}
-                  {session.role === 'applicant' && (
+                  {session.role === "applicant" && (
                     <Link
                       className="button primary"
                       to={`/applicant/book?venue=${venue.venue_id}`}
@@ -256,32 +258,32 @@ export function Venues() {
 }
 export function Bookings() {
   const { session } = useAuth();
-  const reviewer = session.role === 'approver';
-  const [status, setStatus] = useState('');
-  const [search, setSearch] = useState('');
+  const reviewer = session.role === "approver";
+  const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const result = useBookingData(
-    'bookings',
-    reviewer ? 'review' : 'mine',
+    "bookings",
+    reviewer ? "review" : "mine",
     new URLSearchParams({ offset: String(page * 25), status, search })
       .toString()
-      .replace('status=&', ''),
+      .replace("status=&", ""),
   );
   const bookings = result.data.filter(
     (row) =>
       (!status || row.status === status) &&
-      `${row.purpose} ${row.venue_name} ${row.applicant_name || ''}`
+      `${row.purpose} ${row.venue_name} ${row.applicant_name || ""}`
         .toLowerCase()
         .includes(search.toLowerCase()),
   );
   return (
     <PortalLayout>
       <PageHeading
-        title={reviewer ? 'Review booking requests.' : 'My bookings.'}
+        title={reviewer ? "Review booking requests." : "My bookings."}
       >
         {reviewer
-          ? 'Requests assigned to your approval groups. Open a request to review its details.'
-          : 'Track your requests, decisions and upcoming events.'}
+          ? "Requests assigned to your approval groups. Open a request to review its details."
+          : "Track your requests, decisions and upcoming events."}
       </PageHeading>
       <div className="filter-bar">
         <label className="search-field">
@@ -310,6 +312,7 @@ export function Bookings() {
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
             <option value="cancelled">Cancelled</option>
+            <option value="needs_reassignment">Needs reassignment</option>
           </select>
         </label>
         <button className="button secondary" onClick={result.refresh}>
@@ -322,7 +325,7 @@ export function Bookings() {
           <BookingTable
             bookings={bookings}
             role={session.role}
-            empty={search || status ? 'No matching requests.' : undefined}
+            empty={search || status ? "No matching requests." : undefined}
           />
         </section>
       )}
@@ -349,21 +352,37 @@ export function Bookings() {
 export function Schedule() {
   const { session } = useAuth();
   const [month, setMonth] = useState(() => dateKey().slice(0, 7));
-  const [selected, setSelected] = useState('');
+  const [selected, setSelected] = useState("");
   const [page, setPage] = useState(0);
-  const [year, monthNumber] = month.split('-').map(Number);
+  const [view, setView] = useState("month");
+  const [weekDate, setWeekDate] = useState(dateKey);
+  const weekStart = new Date(`${weekDate}T12:00:00+05:30`);
+  weekStart.setUTCDate(
+    weekStart.getUTCDate() - ((weekStart.getUTCDay() + 6) % 7),
+  );
+  const weekEnd = new Date(weekStart);
+  weekEnd.setUTCDate(weekEnd.getUTCDate() + 7);
+  const [year, monthNumber] = month.split("-").map(Number);
   const days = new Date(year, monthNumber, 0).getDate();
-  const start = campusTimestamp(`${month}-01`, '00:00');
+  const start = campusTimestamp(`${month}-01`, "00:00");
   const next = new Date(Date.UTC(year, monthNumber, 1))
     .toISOString()
     .slice(0, 10);
   const result = useBookingData(
-    'bookings',
-    session.role === 'approver' ? 'review' : 'mine',
+    "bookings",
+    session.role === "admin"
+      ? "all"
+      : session.role === "approver"
+        ? "review"
+        : "mine",
     new URLSearchParams({
       offset: String(page * 25),
-      start_time: start,
-      end_time: campusTimestamp(next, '00:00'),
+      start_time:
+        view === "week" ? campusTimestamp(dateKey(weekStart), "00:00") : start,
+      end_time: campusTimestamp(
+        view === "week" ? dateKey(weekEnd) : next,
+        "00:00",
+      ),
     }).toString(),
   );
   const visible = result.data
@@ -372,62 +391,104 @@ export function Schedule() {
   return (
     <PortalLayout>
       <PageHeading title="Campus calendar.">
-        Month view of your requests. All times in India Standard Time. Booking
-        list is paginated.
+        Week and month views of your requests. All times in India Standard Time.
+        Booking list is paginated.
       </PageHeading>
       <div className="filter-bar">
         <label>
-          Month
-          <input
-            type="month"
-            value={month}
+          View
+          <select
+            aria-label="View"
+            value={view}
             onChange={(e) => {
-              if (e.target.value) {
-                setMonth(e.target.value);
-                setSelected('');
-                setPage(0);
-              }
+              setView(e.target.value);
+              setPage(0);
+              setSelected("");
             }}
-          />
+          >
+            <option value="month">Month</option>
+            <option value="week">Week</option>
+          </select>
         </label>
-        <button className="button secondary" onClick={() => setSelected('')}>
+        {view === "week" && (
+          <label>
+            Week containing
+            <input
+              type="date"
+              value={weekDate}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setWeekDate(e.target.value);
+                  setPage(0);
+                  setSelected("");
+                }
+              }}
+            />
+          </label>
+        )}
+        {view === "month" && (
+          <label>
+            Month
+            <input
+              type="month"
+              value={month}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setMonth(e.target.value);
+                  setSelected("");
+                  setPage(0);
+                }
+              }}
+            />
+          </label>
+        )}
+        <button className="button secondary" onClick={() => setSelected("")}>
           All days
         </button>
       </div>
-      <div className="panel calendar-grid" aria-label="Monthly calendar">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-          <strong key={day} className="muted">
-            {day}
-          </strong>
-        ))}
-        {Array.from(
-          { length: new Date(year, monthNumber - 1, 1).getDay() },
-          (_, i) => (
-            <span key={`empty-${i}`} />
-          ),
-        )}
-        {Array.from({ length: days }, (_, i) => {
-          const date = `${month}-${String(i + 1).padStart(2, '0')}`;
-          const rows = result.data.filter(
-            (row) => dateKey(row.start_time) === date,
-          );
-          return (
-            <button
-              className={
-                selected === date ? 'calendar-day selected' : 'calendar-day'
-              }
-              key={date}
-              onClick={() => setSelected(date)}
-            >
-              <strong>{i + 1}</strong>
-              {rows.slice(0, 2).map((row) => (
-                <span key={row.application_id}>{row.purpose}</span>
-              ))}
-              {rows.length > 2 && <small>+{rows.length - 2} more</small>}
-            </button>
-          );
-        })}
-      </div>
+      {view === "week" ? (
+        <WeeklyCalendar
+          bookings={result.data}
+          weekStart={weekStart}
+          role={session.role}
+          onSelectDate={setSelected}
+        />
+      ) : (
+        <div className="panel calendar-grid" aria-label="Monthly calendar">
+          {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+            <strong key={day} className="muted">
+              {day}
+            </strong>
+          ))}
+          {Array.from(
+            { length: new Date(year, monthNumber - 1, 1).getDay() },
+            (_, i) => (
+              <span key={`empty-${i}`} />
+            ),
+          )}
+          {Array.from({ length: days }, (_, i) => {
+            const date = `${month}-${String(i + 1).padStart(2, "0")}`;
+            const rows = result.data.filter(
+              (row) => dateKey(row.start_time) === date,
+            );
+            return (
+              <button
+                className={
+                  selected === date ? "calendar-day selected" : "calendar-day"
+                }
+                key={date}
+                onClick={() => setSelected(date)}
+              >
+                <strong>{i + 1}</strong>
+                {rows.slice(0, 2).map((row) => (
+                  <span key={row.application_id}>{row.purpose}</span>
+                ))}
+                {rows.length > 2 && <small>+{rows.length - 2} more</small>}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <DataState {...result} />
       {!result.loading && !result.error && (
         <section className="panel">
@@ -462,50 +523,12 @@ export function Profile() {
   return (
     <PortalLayout>
       <PageHeading title="Your profile.">
-        Your registered campus account and review permissions.
+        Manage your campus account.
       </PageHeading>
-      <section className="panel profile-panel">
-        <span className="profile-initial">{user.full_name[0]}</span>
-        <h2>{user.full_name}</h2>
-        <dl className="detail-grid">
-          <div>
-            <dt>Email</dt>
-            <dd>{user.email}</dd>
-          </div>
-          <div>
-            <dt>Account type</dt>
-            <dd>{user.user_type}</dd>
-          </div>
-          <div>
-            <dt>Department</dt>
-            <dd>{user.unit_name || 'Not assigned'}</dd>
-          </div>
-          <div>
-            <dt>Account status</dt>
-            <dd>{user.is_active ? 'Active' : 'Inactive'}</dd>
-          </div>
-        </dl>
-        <h3>Approval groups</h3>
-        {user.approval_groups.length ? (
-          <ul className="group-list">
-            {user.approval_groups.map((group) => (
-              <li key={group.access_id}>
-                <strong>{group.group_name}</strong>
-                <span>
-                  {group.member_role} ·{' '}
-                  {group.can_approve ? 'Can review' : 'Member'}
-                </span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="muted">No approval groups assigned.</p>
-        )}
-        <p className="muted">
-          Contact the campus administrator to update account details or review
-          permissions.
-        </p>
-      </section>
+      <ProfileEditor
+        key={`${user.user_id}/${user.full_name}/${user.home_unit_id}`}
+        user={user}
+      />
     </PortalLayout>
   );
 }

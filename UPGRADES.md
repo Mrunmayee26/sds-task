@@ -5,14 +5,17 @@
 | Area | Implementation |
 | --- | --- |
 | Regression testing | pytest rule/security tests, PostgreSQL API tests, Redis tests and an automated three-account browser workflow |
-| GitHub Actions | Every push and pull-request update runs backend, frontend lint/build and browser jobs; no production credentials |
+| GitHub Actions | Every push and pull-request update runs backend pytest, frontend calendar tests/lint/build and browser jobs; no production credentials |
 | Admin | Dedicated `/admin/login`, dashboard, paginated user management, review permissions, reviewer requests, venue editing, blackouts, all bookings, audit log and operations screen |
-| Registration | Email OTP for verified applicant accounts, followed by an explicit reviewer-group request that an administrator approves or rejects |
+| Registration | Email OTP for applicants and department reviewer requests; reviewer signup creates an ordinary account with a pending access request, and only an administrator grants reviewer permissions |
 | Abuse protection | Shared Redis limits for login, OTP attempts, registration, resend, password recovery and drafting notices; configured college email domains |
 | Account security | Disabling an account stops API access immediately; re-enabling does not revive old sessions. Password reset also revokes old sessions |
 | Password recovery | Email links with hashed, single-use tokens and a 30-minute expiry; new password screen |
 | Competing bookings | Requests may overlap pending or confirmed requests. Only one overlapping booking may become confirmed; reviewers explicitly choose replacement when appropriate |
 | Cancellation policy | Applicants, assigned reviewers and admins can cancel only at least eight hours before the event; replacement obeys the same deadline |
+| Campus approval stages | When configured, the selected faculty advisor reviews first, followed by the venue's primary committee and the Dean for larger venue types. Additional venue committees and their any/all/minimum rules are preserved |
+| Revocation and reassignment | An assigned reviewer can revoke an approved booking at least eight hours before it starts. The applicant selects a new venue or time; a new request restarts approvals while the original votes and audit history remain intact |
+| Profile and calendar | Applicants and reviewers can edit their name/department and switch between monthly and weekly schedules; weekly slots open a booking form with the chosen date and time |
 | Redis drafting notices | Per-user/per-venue, five-minute expiring entries; atomic overlap warning with no identity disclosure; advisory only |
 | Catalog caching | 60-second Redis catalog cache with version invalidation after admin edits. Live availability is never cached |
 | Notifications | Durable in-app updates for submission, reviewer requests, approval/rejection/cancellation and priority replacement; email outbox in the same booking transaction |
@@ -125,6 +128,7 @@ preserves historical bookings and audit data, rather than deleting records.
 ```powershell
 backend/.venv/Scripts/python -m pip install -r backend/requirements-dev.txt
 backend/.venv/Scripts/python -m pytest backend/tests -q
+npm test
 npm run lint
 npm run build
 ```

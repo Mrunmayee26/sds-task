@@ -1,8 +1,10 @@
 export const CAMPUS_TIMEZONE = 'Asia/Kolkata';
-export const statusLabel = (status) =>
-  status === 'submitted'
-    ? 'Pending'
-    : status.charAt(0).toUpperCase() + status.slice(1);
+export const statusLabel = (status) => {
+  if (!status) return '—';
+  if (status === 'submitted') return 'Pending';
+  if (status === 'needs_reassignment') return 'Needs Reassignment';
+  return status.charAt(0).toUpperCase() + status.slice(1);
+};
 export function dateKey(value = new Date()) {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: CAMPUS_TIMEZONE,

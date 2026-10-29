@@ -125,6 +125,44 @@ def test_admin_request_booking_and_cancellation_workflow():
                     )
                     applicant.reload()
                     expect(applicant.locator(".status-approved").first).to_be_visible()
+                    reviewer.get_by_role(
+                        "button", name="Revoke this Booking", exact=True
+                    ).click()
+                    reviewer.get_by_label("Reason for Revocation", exact=False).fill(
+                        "Maintenance requires a new time"
+                    )
+                    reviewer.get_by_role(
+                        "button",
+                        name="Confirm Revoke & Trigger Reassignment",
+                        exact=True,
+                    ).click()
+                    expect(
+                        reviewer.get_by_text("Needs Reassignment", exact=True)
+                    ).to_be_visible()
+                    applicant.reload()
+                    new_date = (
+                        (datetime.fromisoformat(date) + timedelta(days=1))
+                        .date()
+                        .isoformat()
+                    )
+                    applicant.get_by_label("Date", exact=True).fill(new_date)
+                    applicant.get_by_role(
+                        "button",
+                        name="Reassign & Restart Multi-Level Approval",
+                        exact=True,
+                    ).click()
+                    expect(applicant).to_have_url(
+                        "http://127.0.0.1:5174/applicant/bookings/2"
+                    )
+                    reviewer.goto("http://127.0.0.1:5174/approver/bookings/2")
+                    reviewer.get_by_role(
+                        "button", name="Approve request", exact=True
+                    ).click()
+                    expect(reviewer.get_by_role("status")).to_have_text(
+                        "Booking approved."
+                    )
+                    applicant.reload()
+                    expect(applicant.locator(".status-approved").first).to_be_visible()
                     applicant.once("dialog", lambda dialog: dialog.accept())
                     applicant.get_by_role(
                         "button", name="Cancel booking", exact=True
@@ -132,10 +170,44 @@ def test_admin_request_booking_and_cancellation_workflow():
                     expect(applicant.get_by_role("status")).to_have_text(
                         "Your booking has been cancelled."
                     )
+                    applicant.get_by_role("link", name="My profile", exact=True).click()
+                    applicant.get_by_role(
+                        "button", name="Edit Profile", exact=True
+                    ).click()
+                    applicant.get_by_label("Full Name", exact=True).fill(
+                        "Browser Applicant"
+                    )
+                    applicant.get_by_role(
+                        "button", name="Save Changes", exact=True
+                    ).click()
+                    expect(
+                        applicant.get_by_role(
+                            "heading", name="Browser Applicant", exact=True
+                        )
+                    ).to_be_visible()
+                    applicant.get_by_role("link", name="Schedule", exact=True).click()
+                    applicant.get_by_label("View", exact=True).select_option("week")
+                    expect(applicant.locator(".gcal-container")).to_be_visible()
+                    applicant.get_by_label("Week containing", exact=True).fill(new_date)
+                    expect(applicant.locator(".gcal-event-block")).to_have_count(2)
+                    applicant.screenshot(path=str(log / "weekly-calendar.png"))
                     applicant.set_viewport_size({"width": 390, "height": 844})
+                    applicant.screenshot(path=str(log / "weekly-calendar-mobile.png"))
                     assert applicant.evaluate(
                         "document.documentElement.scrollWidth <= innerWidth"
                     )
+                    applicant.locator(
+                        f'a[href*="date={new_date}"][href*="start_time=09:00"]'
+                    ).first.click()
+                    expect(applicant.get_by_label("Date", exact=True)).to_have_value(
+                        new_date
+                    )
+                    expect(
+                        applicant.get_by_label("Start time", exact=True)
+                    ).to_have_value("09:00")
+                    expect(
+                        applicant.get_by_label("End time", exact=True)
+                    ).to_have_value("10:00")
                     admin.screenshot(path=str(log / "admin-dashboard.png"))
                 finally:
                     browser.close()

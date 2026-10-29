@@ -2,7 +2,12 @@ from typing import Literal
 from fastapi import APIRouter, Depends, Query
 from app.core.dependencies import get_current_user
 from app.models.auth import UserProfile
-from app.models.booking import BookingCreate, BookingDecision
+from app.models.booking import (
+    BookingCreate,
+    BookingDecision,
+    BookingRevoke,
+    BookingReassign,
+)
 from app.repositories import booking_repo
 from pydantic import AwareDatetime
 from app.db.session import get_db_cursor
@@ -22,7 +27,10 @@ def create_booking(data: BookingCreate, user: UserProfile = Depends(get_current_
 @router.get("")
 def list_bookings(
     scope: Literal["mine", "review"] = "mine",
-    status: Literal["submitted", "approved", "rejected", "cancelled"] | None = None,
+    status: (
+        Literal["submitted", "approved", "rejected", "cancelled", "needs_reassignment"]
+        | None
+    ) = None,
     limit: int = Query(100, ge=1, le=200),
     offset: int = Query(0, ge=0),
     user: UserProfile = Depends(get_current_user),
@@ -84,3 +92,19 @@ def booking_status(
     user: UserProfile = Depends(get_current_user),
 ):
     return booking_repo.decide_booking(booking_id, user.user_id, data)
+
+
+@router.post("/{booking_id}/revoke")
+def revoke(
+    booking_id: int, data: BookingRevoke, user: UserProfile = Depends(get_current_user)
+):
+    return booking_repo.revoke_booking(booking_id, user.user_id, data)
+
+
+@router.post("/{booking_id}/reassign")
+def reassign(
+    booking_id: int,
+    data: BookingReassign,
+    user: UserProfile = Depends(get_current_user),
+):
+    return booking_repo.reassign_booking(booking_id, user.user_id, data)

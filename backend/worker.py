@@ -25,6 +25,8 @@ def reminders():
             JOIN group_members gm ON gm.access_id=aa.access_id JOIN users u ON u.user_id=gm.user_id
             WHERE a.status='submitted' AND aa.status='pending' AND gm.can_approve AND gm.left_at IS NULL AND u.is_active
             AND a.applicant_user_id<>gm.user_id
+            AND NOT EXISTS(SELECT 1 FROM approval_groups ag WHERE ag.access_id=gm.access_id AND ag.group_name='Faculty Advisors Committee'
+                AND a.faculty_advisor_id IS NOT NULL AND a.faculty_advisor_id<>gm.user_id)
             AND a.submitted_at<NOW()-(%s * INTERVAL '1 hour')
             AND aa.approval_step=(SELECT MIN(x.approval_step) FROM application_approvals x WHERE x.application_id=a.application_id AND x.status='pending')
             AND EXISTS(SELECT 1 FROM booking_slots s WHERE s.application_id=a.application_id AND s.start_time>NOW())

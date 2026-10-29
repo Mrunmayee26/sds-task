@@ -181,16 +181,14 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              {role === 'applicant' && (
-                <Route
-                  path="book"
-                  element={
-                    <ProtectedRoute role={role}>
-                      <BookVenue />
-                    </ProtectedRoute>
-                  }
-                />
-              )}
+              <Route
+                path="book"
+                element={
+                  <ProtectedRoute role={role}>
+                    <BookVenue />
+                  </ProtectedRoute>
+                }
+              />
             </Route>
           ))}
           <Route

@@ -3,7 +3,7 @@ Pydantic models for authentication, registration, and user profiles.
 """
 
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 EMAIL_PATTERN = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
 
@@ -21,6 +21,7 @@ class UserRegisterRequest(BaseModel):
     )
     identifier: Optional[str] = None
     home_unit_id: Optional[int] = None
+    designation: Optional[str] = Field(default=None, max_length=100)
 
     def get_full_name(self) -> str:
         if self.full_name and self.full_name.strip():
@@ -54,9 +55,24 @@ class UserProfile(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
+    access_token: str = ""
     token_type: str = "bearer"
-    user: UserProfile
+    user: Optional[UserProfile] = None
+    status: str = "verified"
+    message: Optional[str] = None
+
+
+class UserDepartmentBrief(BaseModel):
+    unit_id: int
+    unit_name: str
+    unit_code: Optional[str] = None
+    unit_type: Optional[str] = None
+
+
+class UserProfileUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    full_name: str = Field(min_length=2, max_length=150)
+    home_unit_id: Optional[int] = Field(default=None, gt=0)
 
 
 class RegisterInitResponse(BaseModel):

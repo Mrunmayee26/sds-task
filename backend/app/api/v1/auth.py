@@ -15,11 +15,18 @@ from app.models.auth import (
     RegisterInitResponse,
     VerifyOtpRequest,
     ResendOtpRequest,
+    UserProfileUpdate,
+    UserDepartmentBrief,
 )
 from app.repositories.user_repo import (
     get_user_by_email,
     get_user_approval_groups,
     create_user,
+    get_user_by_id,
+    get_all_organizational_units,
+    get_approval_group_for_unit,
+    update_user_profile,
+    get_all_faculty_advisors,
 )
 from app.repositories.otp_repo import (
     save_otp,
@@ -30,6 +37,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.core.email import send_otp_email
 from app.core.dependencies import get_current_user
 from app.core.cache import limit_attempts
+from app.db.session import get_db_cursor
 
 router = APIRouter()
 
@@ -50,13 +58,28 @@ async def register_user(payload: UserRegisterRequest):
     normalized_email = payload.email.strip().lower()
     limit_attempts("register", normalized_email, 5, 3600)
     domain = normalized_email.rsplit("@", 1)[-1]
-    allowed_domains={value.strip().lower() for value in settings.ALLOWED_EMAIL_DOMAINS.split(',') if value.strip()}
+    allowed_domains = {
+        value.strip().lower()
+        for value in settings.ALLOWED_EMAIL_DOMAINS.split(",")
+        if value.strip()
+    }
     if allowed_domains and domain not in allowed_domains:
         raise HTTPException(422, "Use an approved college email address.")
-    if payload.role.strip().lower() != "applicant":
-        raise HTTPException(
-            403, "Approver accounts must be assigned by an administrator."
+    requested_role = payload.role.strip().lower()
+    if requested_role not in ("applicant", "approver"):
+        raise HTTPException(403, "Public signup cannot create administrator accounts.")
+    access_id = None
+    if requested_role == "approver":
+        if not payload.home_unit_id:
+            raise HTTPException(403, "Select a department to request reviewer access.")
+        access_id = await run_in_threadpool(
+            get_approval_group_for_unit, payload.home_unit_id
         )
+        if not access_id:
+            raise HTTPException(
+                422,
+                "No active review group is assigned to this department. Contact the administrator.",
+            )
     if not settings.SMTP_ENABLED:
         raise HTTPException(
             503,
@@ -83,6 +106,8 @@ async def register_user(payload: UserRegisterRequest):
         "user_type": user_type,
         "home_unit_id": payload.home_unit_id,
         "identifier": payload.identifier,
+        "requested_access_id": access_id,
+        "designation": payload.designation,
     }
 
     # Generate 6-digit OTP and save in staging table
@@ -139,6 +164,18 @@ def verify_registration_otp(payload: VerifyOtpRequest):
 
     user_id = created["user_id"]
     user_type = created["user_type"]
+    if staged_data.get("user_type") == "approver":
+        from app.repositories.admin_repo import request_approver
+
+        request_approver(
+            user_id,
+            staged_data["requested_access_id"],
+            f"Verified reviewer registration: {staged_data.get('designation') or 'Department reviewer'}",
+        )
+        return TokenResponse(
+            status="pending_admin_approval",
+            message="Email verified. Your reviewer access request is waiting for administrator approval.",
+        )
 
     groups_data = get_user_approval_groups(user_id)
     groups = [
@@ -287,3 +324,30 @@ def get_my_profile(current_user: UserProfile = Depends(get_current_user)):
     Retrieves the currently authenticated user's profile and active approval groups.
     """
     return current_user
+
+
+@router.get("/departments", response_model=list[UserDepartmentBrief])
+def departments():
+    return get_all_organizational_units()
+
+
+@router.get("/faculty-advisors")
+def faculty_advisors(user=Depends(get_current_user)):
+    return get_all_faculty_advisors()
+
+
+@router.put("/profile", response_model=UserProfile)
+def profile(payload: UserProfileUpdate, user=Depends(get_current_user)):
+    if payload.home_unit_id is not None:
+        with get_db_cursor(commit=False) as cur:
+            cur.execute(
+                "SELECT 1 FROM organizational_units WHERE unit_id=%s",
+                (payload.home_unit_id,),
+            )
+            if not cur.fetchone():
+                raise HTTPException(422, "Department not found")
+    update_user_profile(user.user_id, payload.full_name, payload.home_unit_id)
+    fresh = get_user_by_id(user.user_id)
+    return UserProfile(
+        **{**fresh, "approval_groups": get_user_approval_groups(user.user_id)}
+    )
