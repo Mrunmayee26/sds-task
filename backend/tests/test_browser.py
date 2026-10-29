@@ -17,6 +17,77 @@ pytestmark = pytest.mark.skipif(
 )
 
 
+def test_recovery_form_email_otp_and_new_password_steps():
+    """Check the form against mocked delivery; API recovery has separate DB tests."""
+    from playwright.sync_api import sync_playwright, expect
+
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch()
+        try:
+            page = browser.new_page()
+            calls = []
+
+            def api(route):
+                request = route.request
+                if request.method == "OPTIONS":
+                    route.fulfill(
+                        status=204,
+                        headers={
+                            "Access-Control-Allow-Origin": "*",
+                            "Access-Control-Allow-Headers": "*",
+                        },
+                    )
+                    return
+                data = request.post_data_json
+                calls.append((request.url, data))
+                if request.url.endswith("/request-password-otp"):
+                    assert data == {"email": "applicant@coep.ac.in"}
+                    payload = {"message": "Check your inbox for a verification code."}
+                elif request.url.endswith("/verify-password-otp"):
+                    assert data == {"email": "applicant@coep.ac.in", "otp": "123456"}
+                    payload = {
+                        "token": "isolated-browser-recovery-token",
+                        "message": "Email verified. Choose a new password.",
+                    }
+                else:
+                    assert data == {
+                        "token": "isolated-browser-recovery-token",
+                        "password": "RecoveredPassword42",
+                    }
+                    payload = {"message": "Password updated. Sign in again."}
+                route.fulfill(
+                    json=payload, headers={"Access-Control-Allow-Origin": "*"}
+                )
+
+            page.route("**/api/v1/auth/*", api)
+            page.goto("http://127.0.0.1:5174/forgot-password")
+            page.get_by_label("College email", exact=True).fill("applicant@coep.ac.in")
+            page.get_by_role(
+                "button", name="Send verification code", exact=True
+            ).click()
+            expect(page.get_by_label("Verification code", exact=True)).to_be_visible()
+            expect(page.get_by_label("New password", exact=True)).to_have_count(0)
+            page.get_by_label("Verification code", exact=True).fill("123456")
+            page.get_by_role("button", name="Verify code", exact=True).click()
+            page.get_by_label("New password", exact=True).fill("RecoveredPassword42")
+            page.get_by_label("Confirm password", exact=True).fill(
+                "DifferentPassword42"
+            )
+            page.get_by_role("button", name="Update password", exact=True).click()
+            expect(page.get_by_role("alert")).to_have_text("Passwords do not match.")
+            assert len(calls) == 2
+            page.get_by_label("Confirm password", exact=True).fill(
+                "RecoveredPassword42"
+            )
+            page.get_by_role("button", name="Update password", exact=True).click()
+            expect(page.get_by_role("status")).to_have_text(
+                "Password updated. Sign in again."
+            )
+            assert len(calls) == 3
+        finally:
+            browser.close()
+
+
 def test_admin_request_booking_and_cancellation_workflow():
     from playwright.sync_api import sync_playwright, expect
 

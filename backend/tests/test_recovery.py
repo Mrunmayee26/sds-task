@@ -9,6 +9,98 @@ import pytest
 PATH = "/api/v1/auth/forgot-password"
 
 
+def test_otp_recovery_verifies_email_before_allowing_password_change(
+    client, database, headers, monkeypatch
+):
+    messages = []
+
+    async def capture(email, subject, body):
+        messages.append(body)
+        return True
+
+    monkeypatch.setattr("app.api.v1.account.settings.SMTP_ENABLED", True)
+    monkeypatch.setattr("app.api.v1.account.send_message", capture)
+    email = "applicant@coep.ac.in"
+    assert (
+        client.post(
+            "/api/v1/auth/request-password-otp", json={"email": email}
+        ).status_code
+        == 200
+    )
+    code = messages[0].split("code is: ")[1].split()[0]
+    assert len(code) == 6 and code.isdigit()
+    with psycopg2.connect(database) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT token_hash FROM password_resets")
+            assert code not in cur.fetchone()[0]
+    wrong = "000000" if code != "000000" else "000001"
+    verify = "/api/v1/auth/verify-password-otp"
+    assert client.post(verify, json={"email": email, "otp": wrong}).status_code == 400
+    assert (
+        client.post(verify, json={"email": "other@coep.ac.in", "otp": code}).status_code
+        == 400
+    )
+    verified = client.post(verify, json={"email": email, "otp": code})
+    assert verified.status_code == 200, verified.text
+    assert client.post(verify, json={"email": email, "otp": code}).status_code == 400
+    old_session = headers(1)
+    reset = {"token": verified.json()["token"], "password": "RecoveredPassword42"}
+    assert client.post("/api/v1/auth/reset-password", json=reset).status_code == 200
+    assert client.post("/api/v1/auth/reset-password", json=reset).status_code == 400
+    assert client.get("/api/v1/auth/me", headers=old_session).status_code == 401
+    assert (
+        client.post(
+            "/api/v1/auth/login",
+            json={"email": email, "password": "RecoveredPassword42"},
+        ).status_code
+        == 200
+    )
+
+
+def test_expired_otp_and_brute_force_are_rejected(client, database, monkeypatch):
+    from app.api.v1.account import recovery_otp_hash
+
+    email = "applicant@coep.ac.in"
+    with psycopg2.connect(database) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES(1,%s,NOW()-INTERVAL '1 minute')",
+                (recovery_otp_hash(email, "123456"),),
+            )
+    for _ in range(5):
+        assert (
+            client.post(
+                "/api/v1/auth/verify-password-otp",
+                json={"email": email, "otp": "123456"},
+            ).status_code
+            == 400
+        )
+    assert (
+        client.post(
+            "/api/v1/auth/verify-password-otp", json={"email": email, "otp": "123456"}
+        ).status_code
+        == 429
+    )
+
+
+def test_otp_email_failure_cannot_report_success(client, database, monkeypatch):
+    async def fail(*args):
+        return False
+
+    monkeypatch.setattr("app.api.v1.account.settings.SMTP_ENABLED", True)
+    monkeypatch.setattr("app.api.v1.account.send_message", fail)
+    assert (
+        client.post(
+            "/api/v1/auth/request-password-otp", json={"email": "applicant@coep.ac.in"}
+        ).status_code
+        == 503
+    )
+    with psycopg2.connect(database) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM password_resets")
+            assert cur.fetchone()[0] == 0
+
+
 def test_failed_delivery_reports_error_and_removes_token(client, database, monkeypatch):
     async def fail(*args):
         return False

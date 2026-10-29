@@ -35,6 +35,15 @@ Edit `backend/.env`:
   provider's SPA fallback. SMTP port 587 uses STARTTLS; port 465 uses implicit TLS.
   A delivery failure now returns 503 and removes the undelivered reset token.
 
+The forgot-password form sends a six-digit OTP through
+`POST /api/v1/auth/request-password-otp`. After entering the code,
+`POST /api/v1/auth/verify-password-otp` verifies the email and returns a temporary
+reset authorization. The form then shows new-password and confirmation fields
+and submits to `POST /api/v1/auth/reset-password`. Codes and reset authorization
+expire after 10 minutes; codes are hashed in the existing `password_resets` table.
+No schema change is required. `FRONTEND_URL` is used only by the older emailed-link
+recovery endpoint, which remains available for compatibility.
+
 Start the API:
 
 ```powershell
