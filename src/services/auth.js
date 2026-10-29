@@ -4,6 +4,12 @@ const SESSION_KEY = "venueflow_session_v1";
 const TOKEN_KEY = "venueflow_auth_token_v1";
 export const canApprove = (user) =>
   user?.approval_groups?.some((group) => group.can_approve);
+export const portalRoleForUser = (user, requestedRole = "applicant") =>
+  user?.user_type === "admin"
+    ? "admin"
+    : requestedRole === "approver" && canApprove(user)
+      ? "approver"
+      : "applicant";
 export const dashboardForRole = (role) =>
   `/${["approver", "admin"].includes(role) ? role : "applicant"}/dashboard`;
 
@@ -17,13 +23,14 @@ export function getSession() {
       atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")),
     );
     if (payload.exp * 1000 <= Date.now()) return null;
-    return session;
+    return { ...session, role: portalRoleForUser(session.user, session.role) };
   } catch {
     return null;
   }
 }
 
 export function saveSession(user, token, role = "applicant") {
+  role = portalRoleForUser(user, role);
   sessionStorage.setItem(TOKEN_KEY, token);
   sessionStorage.setItem(
     SESSION_KEY,
@@ -51,8 +58,9 @@ export async function authenticate(email, password, role) {
       method: "POST",
       body: { email, password, role },
     });
-    saveSession(data.user, data.access_token, role);
-    return { ok: true, user: { ...data.user, role } };
+    const authenticatedRole = portalRoleForUser(data.user, role);
+    saveSession(data.user, data.access_token, authenticatedRole);
+    return { ok: true, user: { ...data.user, role: authenticatedRole } };
   } catch (error) {
     return { ok: false, message: error.message };
   }

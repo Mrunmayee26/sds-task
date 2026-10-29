@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AuthContext } from '../../services/authContext';
 import { apiRequest } from '../../services/apiClient';
-import { canApprove, getSession } from '../../services/auth';
+import { getSession, portalRoleForUser } from '../../services/auth';
 
 export default function AuthProvider({ children }) {
   const [session, setSession] = useState(getSession);
@@ -28,12 +28,7 @@ export default function AuthProvider({ children }) {
     apiRequest('api/v1/auth/me', { signal: controller.signal })
       .then((user) => {
         if (controller.signal.aborted) return;
-        const role =
-          stored.role === 'admin' && user.user_type === 'admin'
-            ? 'admin'
-            : stored.role === 'approver' && canApprove(user)
-              ? 'approver'
-              : 'applicant';
+        const role = portalRoleForUser(user, stored.role);
         const verified = { ...stored, user, role };
         sessionStorage.setItem(
           'venueflow_session_v1',
