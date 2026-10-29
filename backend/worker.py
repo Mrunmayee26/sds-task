@@ -4,6 +4,7 @@ Email delivery is at-least-once: a crash after sending may cause a duplicate.
 
 import asyncio
 import logging
+import redis
 from app.db.session import get_db_cursor, close_db_pool
 from app.config import settings
 from app.core.email import send_message
@@ -70,7 +71,12 @@ async def main():
                 await deliver_batch()
                 client = get_redis()
                 if client:
-                    client.set("venueflow:worker-heartbeat", "running", ex=180)
+                    try:
+                        client.set("venueflow:worker-heartbeat", "running", ex=180)
+                    except redis.RedisError:
+                        logger.warning(
+                            "Redis worker heartbeat update failed (Redis unreachable)"
+                        )
             except Exception:
                 logger.exception("Notification cycle failed; retrying in 60 seconds")
             await asyncio.sleep(60)

@@ -1,5 +1,12 @@
 # Admin and reliability upgrades
 
+The October 29 integration includes `dev_adwait` and `fix/try_merge`, along with
+their `main` history. Existing eight-hour cancellation rules, admin-only permission
+grants, shared Redis authentication limits, and venue committee approval thresholds
+are preserved. The optional worker heartbeat handles Redis outages gracefully.
+Reassignment creates a fresh request so prior approval and revocation records
+remain available for audit.
+
 ## What changed
 
 | Area | Implementation |

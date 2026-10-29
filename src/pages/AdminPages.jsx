@@ -97,6 +97,25 @@ export default function AdminPage({ section = 'dashboard' }) {
               </article>
             ))}
           </div>
+          {result.data.pending_requests > 0 && (
+            <section
+              className="panel detail-panel"
+              style={{ borderLeft: '4px solid #f59e0b' }}
+            >
+              <h2>
+                Reviewer requests awaiting approval (
+                {result.data.pending_requests})
+              </h2>
+              <p>
+                Review the requested department and role before approving
+                reviewer access.
+              </p>
+              <Link className="button primary" to="/admin/requests">
+                Open reviewer requests
+              </Link>
+            </section>
+          )}
+
           <section className="panel detail-panel">
             <h2>Administrator workflow</h2>
             <p>
